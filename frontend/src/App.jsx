@@ -51,9 +51,9 @@ function Badge({ children, color = TEAL }) {
   );
 }
 
-function Card({ children, style: s = {}, onClick }) {
+function Card({ children, style: s = {}, onClick, testId, className }) {
   return (
-    <div style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 12,
+    <div data-testid={testId} className={className} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 12,
       padding: 16, boxShadow: "var(--shadow-sm)", ...s }} onClick={onClick}>
       {children}
     </div>
@@ -2162,6 +2162,7 @@ function SuperTagsCard({ tagLibrary, idx, complaintName, history, pdfBuffers }) 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#6E40C9" }}>{item.label}</span>
                   <button 
+                    data-testid={`supertag-view-page-${index}`}
                     onClick={() => setPageViewer({ docName: item.source, page: item.page })}
                     style={{ fontSize: 10, fontWeight: 600, color: "#6E40C9", background: "#F3EEFF", border: "1px solid #D8C7FF", borderRadius: 5, padding: "1px 6px", cursor: "pointer" }}
                   >
@@ -2200,7 +2201,7 @@ function DifferentialsPanel({ differentials, onClickDiag }) {
       {differentials.map((d, i) => {
         const col = LIKELIHOOD_COLORS[d.likelihood] || LIKELIHOOD_COLORS.low;
         return (
-          <div key={i} onClick={() => onClickDiag(d.name)}
+          <div key={i} data-testid={`differential-item-${i}`} onClick={() => onClickDiag(d.name)}
             style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer",
               background: col.bg, border: `1.5px solid ${col.border}`, transition: "all 0.15s" }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: col.dot, flexShrink: 0, marginTop: 4 }} />
@@ -2219,10 +2220,10 @@ function DifferentialsPanel({ differentials, onClickDiag }) {
 }
 
 // ─── Option Button ────────────────────────────────────────────────────────────
-function OptionButton({ label, onClick }) {
+function OptionButton({ label, onClick, testId }) {
   const [hov, setHov] = useState(false);
   return (
-    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    <button data-testid={testId} onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ width: "100%", padding: "12px 16px", textAlign: "left", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer",
         border: `1.5px solid ${hov ? TEAL.border : "var(--color-border-primary)"}`,
         background: hov ? TEAL.bg : "#fff", color: "var(--color-text-primary)", transition: "all 0.15s", fontFamily: "var(--font-sans)" }}>
@@ -2504,8 +2505,8 @@ Rules:
         {aiOnly && <Badge color={{ bg: "#4c1d95", text: "#F3E8FF", border: "#A855F7" }}>✨ AI Mode</Badge>}
         {retrieveMs && <span style={{ fontSize: 11, color: TEAL.primary, fontWeight: 600 }}>⚡ {retrieveMs}ms</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <Btn small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
-          <Btn small variant="ghost" onClick={onEnd}>End</Btn>
+          <Btn testId="generate-note-btn" small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
+          <Btn testId="end-consultation-btn" small variant="ghost" onClick={onEnd}>End</Btn>
         </div>
       </div>
 
@@ -2552,10 +2553,10 @@ Rules:
                 <p style={{ fontSize: 14, color: AMBER.text, fontWeight: 500, margin: "0 0 12px" }}>{error}</p>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {history.length >= 4 && (
-                    <Btn small onClick={() => onNote(history, differentials, redFlags)}>Generate Note Offline →</Btn>
+                    <Btn testId="generate-note-offline-btn" small onClick={() => onNote(history, differentials, redFlags)}>Generate Note Offline →</Btn>
                   )}
                   {!apiKey && setSettingsOpen && (
-                    <Btn small variant="secondary" onClick={() => setSettingsOpen(true)}>⚙️ Add API Key</Btn>
+                    <Btn testId="add-api-key-btn" small variant="secondary" onClick={() => setSettingsOpen(true)}>⚙️ Add API Key</Btn>
                   )}
                 </div>
               </div>
@@ -2580,6 +2581,7 @@ Rules:
                                 return (
                                   <button
                                     key={opt}
+                                    data-testid={`opd-option-${qObj.key}-${opt}`}
                                     onClick={() => setOpdAnswers(prev => ({ ...prev, [qObj.key]: opt }))}
                                     style={{
                                       padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", fontFamily: "var(--font-sans)",
@@ -2597,6 +2599,7 @@ Rules:
                           )}
 
                           <input
+                            data-testid={`opd-answer-input-${qObj.key}`}
                             value={ans}
                             onChange={e => setOpdAnswers(prev => ({ ...prev, [qObj.key]: e.target.value }))}
                             placeholder={opts.length > 0 ? "Or type a custom answer..." : "Type answer..."}
@@ -2611,6 +2614,7 @@ Rules:
                     })}
                     
                     <Btn 
+                      testId="submit-opd-answers-btn"
                       disabled={Object.keys(opdAnswers).length === 0} 
                       onClick={() => {
                         const newHist = [...history];
@@ -2646,14 +2650,14 @@ Rules:
           )}
 
           {!loading && !error && !opdMode && options.map((opt, i) => (
-            <OptionButton key={i} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
+            <OptionButton key={i} testId={`option-btn-${i}`} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
           ))}
 
           {!opdMode && (
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+                  <button data-testid="voice-toggle-btn" onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
                     style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
                       border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
                       background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
@@ -2661,14 +2665,14 @@ Rules:
                     🎙 {voiceOn ? "Stop" : "Speak"}
                   </button>
                   {voiceTx && !voiceOn && (
-                    <button onClick={() => handleAnswer(voiceTx)}
+                    <button data-testid="use-voice-transcript-btn" onClick={() => handleAnswer(voiceTx)}
                       style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
                         border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
                       Use this →
                     </button>
                   )}
                   {discussionMode && (
-                    <Btn small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
+                    <Btn testId="generate-note-discussion-btn" small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
                       Generate Note ({history.length} items) →
                     </Btn>
                   )}
@@ -2681,11 +2685,11 @@ Rules:
               </div>
 
               <div style={{ display: "flex", gap: 8 }}>
-                <input value={customIn} onChange={e => setCustomIn(e.target.value)}
+                <input data-testid="custom-answer-input" value={customIn} onChange={e => setCustomIn(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && customIn.trim()) handleAnswer(customIn.trim()); }}
                   placeholder="Or type a custom answer…"
                   style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
-                <button onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
+                <button data-testid="send-custom-answer-btn" onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
                   style={{ padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)" }}>→</button>
               </div>
             </>
@@ -2762,8 +2766,8 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <Btn small variant="ghost" onClick={() => navigator.clipboard?.writeText(note)}>Copy</Btn>
-          <Btn small onClick={onNewPatient}>New Patient</Btn>
+          <Btn testId="copy-note-btn" small variant="ghost" onClick={() => navigator.clipboard?.writeText(note)}>Copy</Btn>
+          <Btn testId="new-patient-btn" small onClick={onNewPatient}>New Patient</Btn>
         </div>
       </div>
       <div style={{ flex: 1, padding: 24, maxWidth: 760, margin: "0 auto", width: "100%" }}>
@@ -2857,7 +2861,7 @@ export default function App() {
 
             <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
               {/* Card 1: ClinicFlow */}
-              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
+              <Card testId="home-card-clinicflow" onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
                 <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
                   <CardCarousel accent="#0d9488" slides={[IllustConsult, IllustDifferential, IllustSafety]} />
                 </div>
@@ -2869,14 +2873,14 @@ export default function App() {
                   <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
                     Interactive clinical consultations, patient history taking, differentials weighting, and automated clinical documentation designed for Indian OPDs.
                   </p>
-                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "var(--color-teal-primary)", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(13, 148, 136, 0.2)" }}>
+                  <button data-testid="launch-clinicflow-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "var(--color-teal-primary)", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(13, 148, 136, 0.2)" }}>
                     Launch ClinicFlow →
                   </button>
                 </div>
               </Card>
 
               {/* Card 2: SuperSummary */}
-              <Card onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
+              <Card testId="home-card-supersummary" onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
                 <div style={{ background: "#f5f3ff", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
                   <CardCarousel accent="#7c3aed" slides={[IllustDocs, IllustScan]} />
                 </div>
@@ -2888,14 +2892,14 @@ export default function App() {
                   <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
                     Advanced discharge summary generator. Create templates, parse intake documents via OCR, review safety checklists, and save/export results.
                   </p>
-                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#7c3aed", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(124, 58, 237, 0.2)" }}>
+                  <button data-testid="launch-supersummary-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#7c3aed", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(124, 58, 237, 0.2)" }}>
                     Launch SuperSummary →
                   </button>
                 </div>
               </Card>
 
               {/* Card 3: SuperMemory — your reference library, surfaced right on the home page */}
-              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
+              <Card testId="home-card-supermemory" onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
                 <div style={{ background: "#fff7ed", borderBottom: "1px solid rgba(245, 158, 11, 0.1)" }}>
                   <CardCarousel accent="#f59e0b" slides={[IllustLibrary, IllustDocs]} />
                 </div>
@@ -2907,14 +2911,14 @@ export default function App() {
                   <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
                     Your textbooks and hospital protocols, AI-indexed. Upload once, then search or jump to the exact page mid-consult — fully offline.
                   </p>
-                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
+                  <button data-testid="open-supermemory-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
                     Open SuperMemory →
                   </button>
                 </div>
               </Card>
 
               {/* Card 4: MoProPrep — external gamified learning platform */}
-              <Card onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
+              <Card testId="home-card-moproprep" onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
                 <div style={{ background: "#ecfeff", borderBottom: "1px solid rgba(8, 145, 178, 0.1)" }}>
                   <CardCarousel accent="#0891b2" slides={[IllustGame]} />
                 </div>
@@ -2926,14 +2930,14 @@ export default function App() {
                   <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
                     Learn medicine the fun way — a gamified prep platform with quizzes, streaks, and challenges. Opens in a new tab.
                   </p>
-                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
+                  <button data-testid="play-learn-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
                     Play & Learn ↗
                   </button>
                 </div>
               </Card>
 
               {/* Card 5: DnbProPrep — external DNB exam prep platform */}
-              <Card onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
+              <Card testId="home-card-dnbproprep" onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
                 <div style={{ background: "#eef2ff", borderBottom: "1px solid rgba(79, 70, 229, 0.1)" }}>
                   <CardCarousel accent="#4f46e5" slides={[IllustDnb]} />
                 </div>
@@ -2945,7 +2949,7 @@ export default function App() {
                   <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
                     Focused DNB exam preparation — structured practice and review material. Opens in a new tab.
                   </p>
-                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
+                  <button data-testid="prep-dnb-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
                     Prep for DNB ↗
                   </button>
                 </div>
