@@ -3,12 +3,15 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const TEAL  = { primary: "#0F6E56", light: "#1D9E75", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
-const AMBER = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
-const RED   = { primary: "#E24B4A", bg: "#FCEBEB", border: "#F7C1C1", text: "#791F1F" };
-const GRAY  = { dot: "#888780", bg: "#F1EFE8", text: "#444441" };
+const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
+const AMBER = { primary: "#d97706", bg: "#fef3c7", border: "#fde68a", text: "#78350f" };
+const RED   = { primary: "#e11d48", bg: "#fff1f2", border: "#fecdd3", text: "#9f1239" };
+const GRAY  = { dot: "#6b7280", bg: "#f3f4f6", text: "#1f2937" };
+
+const PURPLE = { primary: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", text: "#5b21b6" };
 
 const LIKELIHOOD_COLORS = {
   high:   { dot: TEAL.light,    text: TEAL.text,   bg: TEAL.bg,   border: TEAL.border },
@@ -297,8 +300,8 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
 
         <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-            <strong>ClinicalMind</strong><br />
-            Built for junior doctors in Indian government hospitals.<br /><br />
+            <strong>ClinicFlow</strong><br />
+            Built for doctors in Indian OPDs.<br /><br />
             All processing is local. Your patient data never leaves your device.
           </p>
         </div>
@@ -703,7 +706,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
               Clinical Reference Content <span style={{ fontWeight: 400, fontSize: 12 }}>(BM25-indexed — used as AI context and for the diagnosis sidebar)</span>
             </label>
-            <textarea style={{ ...inputS, minHeight: 320, resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7 }}
+            <textarea className="premium-textarea" style={{ minHeight: 320, resize: "vertical" }}
               value={form.clinicalContent}
               onChange={e => setForm(f => ({ ...f, clinicalContent: e.target.value }))}
               placeholder="Paste clinical reference text here — differentials, red flags, investigations, treatment. Plain text is fine." />
@@ -725,11 +728,12 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
   );
 }
 
-// ─── Document Vault ───────────────────────────────────────────────────────────
+// ─── SuperMemory (collapsed Document Vault) ──────────────────────────────────
 function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pdfBuffers, onOpenReader, onOpenTagLibrary }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(null);
   const [parsing, setParsing] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const fileRef = useRef();
 
   const processFile = async (file) => {
@@ -774,10 +778,53 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
       .filter(t => t.sources.length > 0));
   };
 
+  const totalDocs = pdfDocs.length;
+  const totalTags = tagLibrary.length;
+
+  if (!expanded) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 2 }}>
+          <CardCarousel accent={PURPLE.primary} height={110} slides={[IllustLibrary, IllustDocs]} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
+          <span style={{ fontSize: 10, background: PURPLE.bg, color: PURPLE.primary, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>AI INDEXED</span>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.45 }}>
+          Forgotten asthma algorithm in OPD? Not anymore. Create your custom tags from your books and just review your custom tags.
+        </p>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-primary)", margin: 0 }}>
+          📄 {totalDocs} book{totalDocs !== 1 ? "s" : ""} uploaded · 🏷️ {totalTags} custom tag{totalTags !== 1 ? "s" : ""}
+        </p>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button 
+            onClick={() => setExpanded(true)}
+            style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${PURPLE.border}`, background: PURPLE.bg, color: PURPLE.primary, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+          >
+            📥 Manage Books & Tags
+          </button>
+          {totalTags > 0 && (
+            <button 
+              onClick={onOpenTagLibrary}
+              style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)" }}
+            >
+              📚 View Tag Library
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Document Vault</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
+        <button onClick={() => setExpanded(false)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>Collapse ✕</button>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>Manage your medical books and protocol library</p>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {tagLibrary.length > 0 && (
             <button onClick={onOpenTagLibrary} style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, background: "none", border: "none", cursor: "pointer" }}>📚 Tag Library ({tagLibrary.length})</button>
@@ -873,7 +920,14 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
 function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onModeChange }) {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
-  const [tab, setTab] = useState("System");
+  const [tab, setTab] = useState("AI");
+  
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleTab = (t) => {
     setTab(t);
@@ -890,29 +944,26 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
     return matchCat && matchSearch;
   });
 
-  const TAB_COLORS = {
-    AI: { active: { bg: "#1E1E2E", border: "#5B5BDB", color: "#A5A5FF" }, inactive: {} }
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Complaint Library</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: TEAL.primary }}>Complaint Library</h3>
         {tab !== "AI" && <Btn small onClick={() => onEdit(null)}>+ New</Btn>}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["System","Private","Community","AI"].map(t => (
           <button key={t} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-            borderColor: tab === t ? (t === "AI" ? "#5B5BDB" : TEAL.primary) : "var(--color-border-primary)",
-            background: tab === t ? (t === "AI" ? "#1E1E2E" : TEAL.bg) : "#fff",
-            color: tab === t ? (t === "AI" ? "#A5A5FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
+            borderColor: tab === t ? (t === "AI" ? "#A855F7" : TEAL.primary) : "var(--color-border-primary)",
+            background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : TEAL.bg) : "#fff",
+            boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
+            color: tab === t ? (t === "AI" ? "#F3E8FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
             {t === "AI" ? "✨ AI Mode" : t}
           </button>
         ))}
       </div>
 
       {tab === "AI" ? (
-        <div style={{ background: "linear-gradient(135deg,#1E1E2E,#2A1A4E)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 28 }}>✨</span>
             <div>
@@ -930,6 +981,51 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
             </ul>
           </div>
           <p style={{ fontSize: 11, color: "#5050A0", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>
+        </div>
+      ) : isMobile ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>📁 Select System / Category</label>
+            <input 
+              value={cat === "All" ? "" : cat} 
+              onChange={e => setCat(e.target.value.trim() ? e.target.value : "All")}
+              placeholder="Type to search system (e.g. GI, Neuro)..."
+              list="mobile-categories-list"
+              style={{ padding: "10px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, fontFamily: "var(--font-sans)", width: "100%", outline: "none" }}
+            />
+            <datalist id="mobile-categories-list">
+              {CATEGORIES.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>🩺 Search & Select Complaint</label>
+            <input 
+              value={search} 
+              onChange={e => {
+                const val = e.target.value;
+                setSearch(val);
+                const matched = source.find(c => c.name.toLowerCase() === val.toLowerCase());
+                if (matched) setSelected(matched);
+              }}
+              placeholder="Type to search & select complaint..."
+              list="mobile-complaints-list"
+              style={{ padding: "10px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, fontFamily: "var(--font-sans)", width: "100%", outline: "none" }}
+            />
+            <datalist id="mobile-complaints-list">
+              {filtered.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+          </div>
+
+          {selected && (
+            <div style={{ background: TEAL.bg, border: `1.5px solid ${TEAL.border}`, borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fadeSlideIn 0.2s ease" }}>
+              <div>
+                <span style={{ fontSize: 10, fontWeight: 800, color: TEAL.primary }}>SELECTED COMPLAINT</span>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: "2px 0 0", color: TEAL.text }}>{selected.name}</p>
+              </div>
+              <span style={{ fontSize: 18 }}>✅</span>
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -956,11 +1052,12 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
   );
 }
 
-// ─── Product Toggle: ClinicalMind ⇄ SuperSummary ──────────────────────────────
+// ─── Product Toggle: ClinicFlow ⇄ SuperSummary ──────────────────────────────
 function ProductToggle({ product, setProduct }) {
   const opts = [
-    { id: "clinicalmind", label: "ClinicalMind", color: TEAL.primary, bg: TEAL.bg },
-    { id: "supersummary", label: "SuperSummary", color: "#6E40C9", bg: "#F3EEFF" },
+    { id: null, label: "🏠 Home", color: "var(--color-text-primary)", bg: "var(--color-border-primary)" },
+    { id: "clinicalmind", label: "ClinicFlow", color: TEAL.primary, bg: TEAL.bg },
+    { id: "supersummary", label: "SuperSummary", color: PURPLE.primary, bg: PURPLE.bg },
   ];
   return (
     <div style={{ display: "flex", gap: 3, background: "var(--color-background-secondary)", borderRadius: 20, padding: 3 }}>
@@ -975,9 +1072,46 @@ function ProductToggle({ product, setProduct }) {
   );
 }
 
+// ─── Profile Modal ────────────────────────────────────────────────────────────
+function ProfileModal({ onClose, onSettings }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
+        <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+        </div>
+        <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
+          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", padding: 18, textAlign: "center" }}>
+            <p style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>Attending Doctor</p>
+            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>Indian Government Hospital OPD</p>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div style={{ flex: 1, background: TEAL.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🔒</p>
+              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>On-device only</p>
+            </div>
+            <div style={{ flex: 1, background: PURPLE.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>⚡</p>
+              <p style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>v1.0 ClinicFlow</p>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
+            No account needed — your patient data and API keys never leave this device.
+          </p>
+          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ⚙️ Open Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Profile Menu ─────────────────────────────────────────────────────────────
 function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   const [open, setOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const ref = useRef();
 
   useEffect(() => {
@@ -994,13 +1128,17 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={() => setOpen(v => !v)}
-        style={{ width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${TEAL.border}`, background: TEAL.bg,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer" }}>
+        style={{ width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
         🧑‍⚕️
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", borderRadius: 12,
-          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 190, overflow: "hidden", zIndex: 60 }}>
+          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 200, overflow: "hidden", zIndex: 60 }}>
+          <button onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
+            <span>👤 View Profile</span>
+          </button>
+          <div style={{ height: 1, background: "var(--color-border-primary)" }} />
           <button onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
             <span>📚 Tag Library</span>
             {tagCount > 0 && <span style={{ fontSize: 11, background: TEAL.bg, color: TEAL.primary, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{tagCount}</span>}
@@ -1011,6 +1149,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
           </button>
         </div>
       )}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} onSettings={onSettings} />}
     </div>
   );
 }
@@ -1024,11 +1163,12 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
   const [sex, setSex] = useState("");
   const [editing, setEditing] = useState(undefined);
   const [editingNoAiNotice, setEditingNoAiNotice] = useState(false);
-  const [isAiMode, setIsAiMode] = useState(false);
+  const [isAiMode, setIsAiMode] = useState(true);
   const [aiComplaintText, setAiComplaintText] = useState("");
   const [readerState, setReaderState] = useState(null); // { doc, initPage }
   const [creatingFromPdf, setCreatingFromPdf] = useState(false);
   const [tagLibraryOpen, setTagLibraryOpen] = useState(false);
+  const [consultMode, setConsultMode] = useState("learning");
 
   const addTagSource = (label, docName, page, extractedText, image) => {
     const norm = label.trim().toLowerCase();
@@ -1104,12 +1244,12 @@ Return ONLY valid JSON with this exact structure:
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="hero-band" style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🩺</span>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: TEAL.primary }}>ClinicalMind</h1>
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>India Government Hospital OPD</p>
+            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>ClinicFlow</h1>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Indian OPD</p>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1139,16 +1279,16 @@ Return ONLY valid JSON with this exact structure:
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20, marginBottom: 20 }}>
+        <div className="library-grid">
           <Card><DocumentVault pdfDocs={pdfDocs} setPdfDocs={setPdfDocs} idx={idx} tagLibrary={tagLibrary} setTagLibrary={setTagLibrary} pdfBuffers={pdfBuffers}
             onOpenReader={(doc, initPage) => setReaderState({ doc, initPage: initPage || 1 })}
             onOpenTagLibrary={() => setTagLibraryOpen(true)} /></Card>
           <Card><ComplaintLibrary selected={selected} setSelected={setSelected} onEdit={openEdit} customComplaints={customComplaints} onModeChange={setIsAiMode} /></Card>
         </div>
 
-        <Card style={{ display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap",
-          background: isAiMode ? "linear-gradient(135deg,#1E1E2E,#2A1A4E)" : "#fff",
-          border: isAiMode ? "1.5px solid #5B5BDB" : "1.5px solid var(--color-border-primary)" }}>
+        <Card className="start-card" style={{
+          background: isAiMode ? "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)" : "#fff",
+          border: isAiMode ? "1.5px solid #8B5CF6" : "1.5px solid var(--color-border-primary)" }}>
 
           {/* Complaint selector / AI text input */}
           {isAiMode ? (
@@ -1156,7 +1296,7 @@ Return ONLY valid JSON with this exact structure:
               <label style={{ fontSize: 13, fontWeight: 600, color: "#9090C0", display: "block", marginBottom: 4 }}>Chief Complaint</label>
               <input value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
                 placeholder="e.g. Fever for 3 days, Abdominal pain…"
-                style={{ padding: "9px 12px", border: "1.5px solid #5B5BDB", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
+                style={{ padding: "9px 12px", border: "1.5px solid #8B5CF6", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
             </div>
           ) : selected ? (
             <div style={{ background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 8, padding: "8px 14px" }}>
@@ -1172,10 +1312,10 @@ Return ONLY valid JSON with this exact structure:
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Patient Age</label>
             <div style={{ display: "flex", gap: 6 }}>
               <input type="number" min={0} value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
-                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
+                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }} />
               <select value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
-                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
+                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }}>
                 <option value="years">Years</option>
                 <option value="months">Months</option>
@@ -1190,12 +1330,70 @@ Return ONLY valid JSON with this exact structure:
             <div style={{ display: "flex", gap: 6 }}>
               {["Male","Female","Other"].map(s => (
                 <button key={s} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-                  borderColor: sex === s ? (isAiMode ? "#5B5BDB" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  borderColor: sex === s ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: sex === s ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
-                  color: sex === s ? (isAiMode ? "#A5A5FF" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
+                  color: sex === s ? (isAiMode ? "#D8B4FE" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
                   {s}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Consultation Mode Selector */}
+          <div style={{ width: "100%", borderTop: `1px solid ${isAiMode ? "#3A3A6A" : "var(--color-border-primary)"}`, paddingTop: 16, marginTop: 8 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>Consultation Mode</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div 
+                onClick={() => setConsultMode("learning")}
+                style={{
+                  padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
+                  borderColor: consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  background: consultMode === "learning" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
+                  transition: "all 0.15s"
+                }}
+              >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M4 6 C10 2 18 2 24 6 V30 C18 26 10 26 4 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} opacity="0.85" />
+                  <path d="M44 6 C38 2 30 2 24 6 V30 C30 26 38 26 44 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B8BFF" : TEAL.light) : "#cbd5e1"} />
+                  <line x1="24" y1="6" x2="24" y2="30" stroke="#fff" strokeWidth="1.5" opacity="0.6" />
+                </svg>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14 }}>📖</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "learning" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>Learning Mode</span>
+                </div>
+                <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
+                  Follows the standard structured sequential clinical workflow (one question at a time).
+                </p>
+              </div>
+
+              <div 
+                onClick={() => {
+                  if (hasKey) {
+                    setConsultMode("opd");
+                  } else {
+                    alert("OPD Mode requires an API Key. Please add one in settings or use Learning Mode.");
+                  }
+                }}
+                style={{
+                  padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
+                  borderColor: consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  background: consultMode === "opd" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
+                  opacity: hasKey ? 1 : 0.6,
+                  transition: "all 0.15s"
+                }}
+              >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M27 2 L10 20 h9 l-4 14 L33 16 h-9 Z" fill={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} />
+                  <circle cx="24" cy="18" r="16" fill="none" stroke={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.light) : "#cbd5e1"} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
+                </svg>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14 }}>⚡</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "opd" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>OPD Mode</span>
+                </div>
+                <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
+                  Fast-track mode. AI asks 3–4 questions simultaneously to quickly update differentials.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1205,13 +1403,13 @@ Return ONLY valid JSON with this exact structure:
               disabled={!aiComplaintText.trim() || !age || !hasKey}
               onClick={() => onStart({
                 complaint: { id: "ai_" + Date.now(), name: aiComplaintText.trim(), category: "General", source: "ai", clinicalContent: "", commonDifferentials: [], redFlagKeywords: [], tags: [] },
-                age, sex, aiOnly: true
+                age, sex, aiOnly: true, opdMode: consultMode === "opd"
               })}
-              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff" }}>
+              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#8B5CF6" : "#3A3A6A", color: "#fff" }}>
               {!hasKey ? "⚠ Add API Key First" : "✨ Start AI Consultation →"}
             </Btn>
           ) : (
-            <Btn disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false })} style={{ padding: "11px 28px", fontSize: 15 }}>
+            <Btn disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false, opdMode: consultMode === "opd" })} style={{ padding: "11px 28px", fontSize: 15 }}>
               Start Consultation →
             </Btn>
           )}
@@ -1467,9 +1665,9 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div className="pdf-row" style={{ overflow: "hidden" }}>
         {/* Left: Chapters / Search */}
-        <div style={{ width: 240, background: "#0D1117", borderRight: "1px solid #21262D", padding: "14px 12px", overflowY: "auto", flexShrink: 0, display: "flex", flexDirection: "column" }}>
+        <div className="pdf-sidebar-left" style={{ background: "#0D1117", borderRight: "1px solid #21262D", padding: "14px 12px", overflowY: "auto" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 12, flexShrink: 0 }}>
             {[["chapters", "Chapters"], ["search", "🔍 Search"]].map(([id, label]) => (
               <button key={id} onClick={() => setLeftTab(id)}
@@ -1539,7 +1737,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Canvas */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "28px 24px", background: "#0D1117", position: "relative" }}>
+        <div className="pdf-center" style={{ overflowY: "auto", overflowX: "auto", padding: "28px 24px", background: "#0D1117", position: "relative", alignItems: "flex-start", justifyContent: "center" }}>
           {loadError ? (
             <div style={{ color: "#F87171", fontSize: 14, marginTop: 60, textAlign: "center", maxWidth: 400 }}>
               <p style={{ fontSize: 24, margin: "0 0 12px" }}>⚠️</p>
@@ -1566,7 +1764,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Right panel */}
-        <div style={{ width: 240, background: "#161B22", borderLeft: "1px solid #21262D", padding: "16px 14px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
+        <div className="pdf-sidebar-right" style={{ background: "#161B22", borderLeft: "1px solid #21262D", padding: "16px 14px", overflowY: "auto", gap: 16 }}>
 
           {/* Tag form */}
           {showTagPanel && (
@@ -1863,6 +2061,126 @@ function DiagnosisSidebar({ sidebar, onClose, query, complaintTags, pdfBuffers }
   );
 }
 
+// ─── SuperTags Card ──────────────────────────────────────────────────────────
+function SuperTagsCard({ tagLibrary, idx, complaintName, history, pdfBuffers }) {
+  const [matches, setMatches] = useState([]);
+  const [pageViewer, setPageViewer] = useState(null);
+
+  useEffect(() => {
+    const historyAnswers = history.map(h => h.a).join(" ");
+    const q = (complaintName + " " + historyAnswers).toLowerCase().trim();
+    if (!q) {
+      setMatches([]);
+      return;
+    }
+
+    const words = q.split(/\s+/).filter(w => w.length > 2);
+    if (words.length === 0) {
+      setMatches([]);
+      return;
+    }
+
+    const matchedTags = tagLibrary.filter(tag => {
+      const tagLabel = tag.label.toLowerCase();
+      const matchesLabel = words.some(w => tagLabel.includes(w));
+      const matchesSourceText = tag.sources.some(src => 
+        words.some(w => src.extractedText?.toLowerCase().includes(w))
+      );
+      return matchesLabel || matchesSourceText;
+    });
+
+    let directChunks = [];
+    if (idx && typeof idx.search === "function") {
+      try {
+        directChunks = idx.search(q, 3) || [];
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const combinedMatches = [];
+
+    matchedTags.forEach(t => {
+      t.sources.forEach((src) => {
+        combinedMatches.push({
+          type: "tag",
+          label: `🏷 ${t.label}`,
+          source: src.docName,
+          page: src.page,
+          text: src.extractedText || "No text.",
+          image: src.image
+        });
+      });
+    });
+
+    directChunks.forEach(chunk => {
+      const isDuplicate = combinedMatches.some(m => m.source === chunk.source && m.text.includes(chunk.text.slice(0, 50)));
+      if (!isDuplicate) {
+        combinedMatches.push({
+          type: "chunk",
+          label: `📖 Relatable Passage`,
+          source: chunk.source,
+          page: chunk.page || 1,
+          text: chunk.text,
+          score: chunk.score
+        });
+      }
+    });
+
+    setMatches(combinedMatches.slice(0, 3));
+  }, [tagLibrary, idx, complaintName, history]);
+
+  return (
+    <div style={{ marginTop: 16, borderTop: "1.5px solid var(--color-border-primary)", paddingTop: 16 }}>
+      <div style={{ background: "#F3EEFF", border: "1.5px solid #D8C7FF", borderRadius: 12, padding: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#3E2570", display: "inline-flex", alignItems: "center", gap: 4 }}>✨ SuperTags</span>
+          <span style={{ fontSize: 9, background: "#6E40C9", color: "#fff", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>AI FILTERED</span>
+        </div>
+        <p style={{ fontSize: 11, color: "#3E2570", margin: "0 0 12px", lineHeight: 1.4, opacity: 0.85 }}>
+          Upload multiple books and from them create your custom tags, and view them at any time from your OPD.
+        </p>
+
+        {matches.length === 0 ? (
+          <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0, fontStyle: "italic" }}>
+            No matching tags or book passages found for the current context.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {matches.map((item, index) => (
+              <div key={index} style={{ background: "#fff", border: "1px solid #D8C7FF", borderRadius: 8, padding: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#6E40C9" }}>{item.label}</span>
+                  <button 
+                    onClick={() => setPageViewer({ docName: item.source, page: item.page })}
+                    style={{ fontSize: 10, fontWeight: 600, color: "#6E40C9", background: "#F3EEFF", border: "1px solid #D8C7FF", borderRadius: 5, padding: "1px 6px", cursor: "pointer" }}
+                  >
+                    p.{item.page} ↗
+                  </button>
+                </div>
+                {item.image && (
+                  <img src={item.image} alt="" style={{ maxWidth: "100%", maxHeight: 100, borderRadius: 4, marginBottom: 4, display: "block" }} />
+                )}
+                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.4, maxHeight: 60, overflowY: "auto" }}>
+                  {item.text.slice(0, 180)}{item.text.length > 180 ? "…" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {pageViewer && (
+        <PageViewer 
+          docName={pageViewer.docName} 
+          page={pageViewer.page} 
+          pdfBuffers={pdfBuffers} 
+          onClose={() => setPageViewer(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Differentials Panel ──────────────────────────────────────────────────────
 function DifferentialsPanel({ differentials, onClickDiag }) {
   return (
@@ -1905,7 +2223,7 @@ function OptionButton({ label, onClick }) {
 
 // ─── Consultation Screen ──────────────────────────────────────────────────────
 function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tagLibrary, pdfBuffers, setSettingsOpen }) {
-  const { complaint, age, sex, aiOnly } = session;
+  const { complaint, age, sex, aiOnly, opdMode } = session;
   const complaintTags = (complaint.tagRefs || []).map(id => tagLibrary.find(t => t.id === id)).filter(Boolean);
 
   const [history, setHistory] = useState([]);
@@ -1926,6 +2244,8 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
   const [customIn, setCustomIn] = useState("");
   const [weightMap, setWeightMap] = useState({});
   const [sidebar, setSidebar] = useState({ open: false, diagnosis: "", chunks: [], ms: null });
+  const [opdQuestions, setOpdQuestions] = useState([]);
+  const [opdAnswers, setOpdAnswers] = useState({});
   
   // Discussion Mode states
   const [discussionMode, setDiscussionMode] = useState(false);
@@ -1959,6 +2279,7 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
     }
     // AI-only mode: skip local workflow entirely
     if (aiOnly) { askAI([]); return; }
+    if (opdMode) { askAI([]); return; }
     if (complaint.workflow?.nodes) {
       const entry = complaint.workflow.nodes.find(n => n.id === complaint.workflow.entryNode);
       if (entry) {
@@ -2001,7 +2322,31 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
       : [];
 
     let systemPrompt = buildSystemPrompt(complaint.name, age, sex, combinedContext);
-    if (discussionMode) {
+    if (opdMode) {
+      systemPrompt = `Clinical thinking assistant for junior doctors, India government hospital OPD.
+Patient: ${age || "?"}y ${sex || ""}. Chief complaint: ${complaint.name}.
+
+CLINICAL REFERENCE (retrieved via BM25):
+${combinedContext}
+
+You are in OPD Mode (fast-track). Instead of one question, you MUST generate exactly 3 to 4 distinct, parallel questions to narrow down the differentials.
+Output ONLY valid JSON. No markdown. No explanation. Exactly this structure:
+{
+  "opd_questions": [
+    { "key": "unique_short_key", "question": "Question text here?", "options": ["opt1", "opt2", "opt3", "Not present"] }
+  ],
+  "differentials": [{"name":"...","likelihood":"high|medium|low","reasoning":"one line max"}],
+  "red_flags": ["..."],
+  "done": false
+}
+
+Rules for opd_questions:
+- "key": unique alphanumeric key for the question, e.g. "fever_dur"
+- "question": concise clinical question to ask
+- "options": 3-4 short options, always ending with "Not present" or "Unsure". If it is open-ended or numeric, options can be []
+- Never duplicate questions already in the history.
+- If consultation is complete, set "done": true and empty opd_questions [].`;
+    } else if (discussionMode) {
       systemPrompt = `Interactive clinical discussion assistant for junior doctors, India government hospital OPD.
 Patient: ${age || "?"}y ${sex || ""}. Chief complaint: ${complaint.name}.
 
@@ -2030,15 +2375,19 @@ Rules:
       await callAIStream(msgs, systemPrompt, provider, apiKey, t => { raw = t; setStreamText(t); });
       const parsed = parseJSON(raw);
       if (parsed) {
-        setCurrentQ(parsed.question || "");
-        let nextOpts = parsed.options || [];
-        if (parsed.done && hist.length >= 9) {
-          nextOpts = [
-            "Generate note with current findings",
-            "💬 Discuss further with AI (upload reports & chat)"
-          ];
+        if (opdMode) {
+          setOpdQuestions(parsed.opd_questions || []);
+        } else {
+          setCurrentQ(parsed.question || "");
+          let nextOpts = parsed.options || [];
+          if (parsed.done && hist.length >= 9) {
+            nextOpts = [
+              "Generate note with current findings",
+              "💬 Discuss further with AI (upload reports & chat)"
+            ];
+          }
+          setOptions(nextOpts);
         }
-        setOptions(nextOpts);
         if (parsed.differentials?.length) setDifferentials(parsed.differentials.slice(0, 5));
         if (parsed.red_flags?.length) setRedFlags(p => [...new Set([...p, ...parsed.red_flags])]);
       } else { setError("Could not parse AI response. Tap to retry."); }
@@ -2142,7 +2491,7 @@ Rules:
         <Badge color={TEAL}>{age} · {sex}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>{complaint.name}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>Q{history.length + 1}</Badge>
-        {aiOnly && <Badge color={{ bg: "#1E1E2E", text: "#A5A5FF", border: "#5B5BDB" }}>✨ AI Mode</Badge>}
+        {aiOnly && <Badge color={{ bg: "#4c1d95", text: "#F3E8FF", border: "#A855F7" }}>✨ AI Mode</Badge>}
         {retrieveMs && <span style={{ fontSize: 11, color: TEAL.primary, fontWeight: 600 }}>⚡ {retrieveMs}ms</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <Btn small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
@@ -2157,7 +2506,7 @@ Rules:
         </div>
       )}
 
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 300px", overflow: "hidden" }}>
+      <div className="consultation-layout" style={{ flex: 1, overflow: "hidden" }}>
         <div style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
           {history.length > 0 && (
             <div ref={histRef} style={{ maxHeight: 150, overflowY: "auto", background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 14px" }}>
@@ -2178,12 +2527,9 @@ Rules:
                   {(() => {
                     if (!streamText) return "Thinking…";
                     try {
-                      // Attempt to parse incomplete/streaming JSON to extract the question
                       const cleaned = streamText.replace(/```json|```/g, "").trim();
-                      // Find if we have a "question" field inside the raw stream
                       const match = cleaned.match(/"question"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
                       if (match && match[1]) {
-                        // Unescape double quotes and newlines
                         return match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
                       }
                     } catch (e) {}
@@ -2203,6 +2549,78 @@ Rules:
                   )}
                 </div>
               </div>
+            ) : opdMode ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: TEAL.primary, display: "flex", alignItems: "center", gap: 6 }}>⚡ OPD Fast-Track (Ask parallel questions)</p>
+                {opdQuestions.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>Loading questions...</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {opdQuestions.map((qObj, index) => {
+                      const ans = opdAnswers[qObj.key] || "";
+                      const opts = qObj.options || [];
+                      return (
+                        <div key={qObj.key || index} style={{ borderBottom: index < opdQuestions.length - 1 ? "1px solid var(--color-border-primary)" : "none", paddingBottom: index < opdQuestions.length - 1 ? 14 : 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 8px", color: "var(--color-text-primary)", lineHeight: 1.4 }}>{index + 1}. {qObj.question}</p>
+                          
+                          {opts.length > 0 && (
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                              {opts.map(opt => {
+                                const active = ans === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    onClick={() => setOpdAnswers(prev => ({ ...prev, [qObj.key]: opt }))}
+                                    style={{
+                                      padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", fontFamily: "var(--font-sans)",
+                                      borderColor: active ? TEAL.primary : "var(--color-border-primary)",
+                                      background: active ? TEAL.bg : "#fff",
+                                      color: active ? TEAL.primary : "var(--color-text-secondary)",
+                                      transition: "all 0.15s"
+                                    }}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <input
+                            value={ans}
+                            onChange={e => setOpdAnswers(prev => ({ ...prev, [qObj.key]: e.target.value }))}
+                            placeholder={opts.length > 0 ? "Or type a custom answer..." : "Type answer..."}
+                            style={{
+                              width: "100%", padding: "8px 12px", border: "1.5px solid var(--color-border-primary)",
+                              borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "var(--font-sans)",
+                              background: "#fff", color: "var(--color-text-primary)"
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                    
+                    <Btn 
+                      disabled={Object.keys(opdAnswers).length === 0} 
+                      onClick={() => {
+                        const newHist = [...history];
+                        opdQuestions.forEach(qObj => {
+                          const ans = opdAnswers[qObj.key];
+                          if (ans && ans.trim()) {
+                            newHist.push({ q: qObj.question, a: ans.trim() });
+                          }
+                        });
+                        setHistory(newHist);
+                        setOpdAnswers({});
+                        askAI(newHist);
+                      }}
+                      style={{ alignSelf: "flex-end", marginTop: 8 }}
+                    >
+                      ⚡ Submit OPD Answers ({Object.keys(opdAnswers).length})
+                    </Btn>
+                  </div>
+                )}
+              </div>
             ) : (
               <p style={{ fontSize: 16, fontWeight: 500, margin: 0, lineHeight: 1.6 }}>
                 {currentQ || "Loading first question…"}
@@ -2217,47 +2635,51 @@ Rules:
             </div>
           )}
 
-          {!loading && !error && options.map((opt, i) => (
+          {!loading && !error && !opdMode && options.map((opt, i) => (
             <OptionButton key={i} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
           ))}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
-                  border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
-                  background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
-                {voiceOn && <span style={{ width: 8, height: 8, borderRadius: "50%", background: RED.primary, animation: "pulse 1s infinite" }} />}
-                🎙 {voiceOn ? "Stop" : "Speak"}
-              </button>
-              {voiceTx && !voiceOn && (
-                <button onClick={() => handleAnswer(voiceTx)}
-                  style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
-                    border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
-                  Use this →
-                </button>
-              )}
-              {discussionMode && (
-                <Btn small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
-                  Generate Note ({history.length} items) →
-                </Btn>
-              )}
-            </div>
-            {(voiceOn || voiceTx) && (
-              <div style={{ padding: "10px 14px", background: "#F0FFF8", border: `1.5px solid ${TEAL.border}`, borderRadius: 8, fontSize: 13, color: TEAL.text, minHeight: 40 }}>
-                {voiceTx || <span style={{ opacity: 0.5 }}>Listening…</span>}
+          {!opdMode && (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
+                      border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
+                      background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
+                    {voiceOn && <span style={{ width: 8, height: 8, borderRadius: "50%", background: RED.primary, animation: "pulse 1s infinite" }} />}
+                    🎙 {voiceOn ? "Stop" : "Speak"}
+                  </button>
+                  {voiceTx && !voiceOn && (
+                    <button onClick={() => handleAnswer(voiceTx)}
+                      style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
+                        border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
+                      Use this →
+                    </button>
+                  )}
+                  {discussionMode && (
+                    <Btn small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
+                      Generate Note ({history.length} items) →
+                    </Btn>
+                  )}
+                </div>
+                {(voiceOn || voiceTx) && (
+                  <div style={{ padding: "10px 14px", background: "#F0FFF8", border: `1.5px solid ${TEAL.border}`, borderRadius: 8, fontSize: 13, color: TEAL.text, minHeight: 40 }}>
+                    {voiceTx || <span style={{ opacity: 0.5 }}>Listening…</span>}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <input value={customIn} onChange={e => setCustomIn(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && customIn.trim()) handleAnswer(customIn.trim()); }}
-              placeholder="Or type a custom answer…"
-              style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
-            <button onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
-              style={{ padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)" }}>→</button>
-          </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={customIn} onChange={e => setCustomIn(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && customIn.trim()) handleAnswer(customIn.trim()); }}
+                  placeholder="Or type a custom answer…"
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
+                <button onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
+                  style={{ padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)" }}>→</button>
+              </div>
+            </>
+          )}
 
           {retrieved.length > 0 && (
             <div style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 12 }}>
@@ -2272,8 +2694,9 @@ Rules:
           )}
         </div>
 
-        <div style={{ borderLeft: "1px solid var(--color-border-primary)", padding: 16, overflowY: "auto", background: "#fff" }}>
+        <div className="consultation-sidebar" style={{ borderLeft: "1px solid var(--color-border-primary)", padding: 16, overflowY: "auto", background: "#fff" }}>
           <DifferentialsPanel differentials={differentials} onClickDiag={openSidebar} />
+          <SuperTagsCard tagLibrary={tagLibrary} idx={idx} complaintName={complaint.name} history={history} pdfBuffers={pdfBuffers} />
         </div>
       </div>
 
@@ -2358,7 +2781,7 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
 
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [product, setProduct] = useState("clinicalmind"); // "clinicalmind" | "supersummary"
+  const [product, setProduct] = useState(null); // null = Home Screen, "clinicalmind" | "supersummary"
   const [phase, setPhase] = useState("library");
   const [provider, setProvider] = useState(() => localStorage.getItem("clinicalmind:provider") || "claude");
   const [apiKey, setApiKey] = useState(() => apiKeyFor(localStorage.getItem("clinicalmind:provider") || "claude"));
@@ -2396,17 +2819,146 @@ export default function App() {
         currentKey={apiKey}
         setCurrentKey={handleKeyChange}
       />
+      {product === null && (
+        <div style={{ minHeight: "100vh", background: "var(--color-background-primary)", display: "flex", flexDirection: "column" }}>
+          {/* Header — premium gradient */}
+          <div className="hero-band" style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 26 }}>⚡</span>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#fff", letterSpacing: "-0.5px" }}>ClinicFlow</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0, fontWeight: 500 }}>Comprehensive Clinical Intelligence Suite</p>
+              </div>
+            </div>
+            <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
+          </div>
+
+          {/* Main Dashboard Cards Container */}
+          <div style={{ flex: 1, padding: "32px 20px 0", width: "100%", maxWidth: 1040, margin: "0 auto" }}>
+            {/* Animated premium hero carousel */}
+            <HomeHero />
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text-primary)", margin: 0 }}>Choose your workspace</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Two tools, one clinical suite — pick where you want to start.</p>
+              </div>
+            </div>
+
+            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
+              {/* Card 1: ClinicFlow */}
+              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
+                <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
+                  <CardCarousel accent="#0d9488" slides={[IllustConsult, IllustDifferential, IllustSafety]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🩺</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-teal-primary)", margin: 0 }}>ClinicFlow</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Interactive clinical consultations, patient history taking, differentials weighting, and automated clinical documentation designed for Indian OPDs.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "var(--color-teal-primary)", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(13, 148, 136, 0.2)" }}>
+                    Launch ClinicFlow →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 2: SuperSummary */}
+              <Card onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
+                <div style={{ background: "#f5f3ff", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
+                  <CardCarousel accent="#7c3aed" slides={[IllustDocs, IllustScan]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>📋</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-purple-primary, #7c3aed)", margin: 0 }}>SuperSummary</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Advanced discharge summary generator. Create templates, parse intake documents via OCR, review safety checklists, and save/export results.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#7c3aed", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(124, 58, 237, 0.2)" }}>
+                    Launch SuperSummary →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 3: SuperMemory — your reference library, surfaced right on the home page */}
+              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
+                <div style={{ background: "#fff7ed", borderBottom: "1px solid rgba(245, 158, 11, 0.1)" }}>
+                  <CardCarousel accent="#f59e0b" slides={[IllustLibrary, IllustDocs]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>✨</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#b45309", margin: 0 }}>SuperMemory</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Your textbooks and hospital protocols, AI-indexed. Upload once, then search or jump to the exact page mid-consult — fully offline.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
+                    Open SuperMemory →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 4: MoProPrep — external gamified learning platform */}
+              <Card onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
+                <div style={{ background: "#ecfeff", borderBottom: "1px solid rgba(8, 145, 178, 0.1)" }}>
+                  <CardCarousel accent="#0891b2" slides={[IllustGame]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎮</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0891b2", margin: 0 }}>MoProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Learn medicine the fun way — a gamified prep platform with quizzes, streaks, and challenges. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
+                    Play & Learn ↗
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 5: DnbProPrep — external DNB exam prep platform */}
+              <Card onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
+                <div style={{ background: "#eef2ff", borderBottom: "1px solid rgba(79, 70, 229, 0.1)" }}>
+                  <CardCarousel accent="#4f46e5" slides={[IllustDnb]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎓</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4f46e5", margin: 0 }}>DnbProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Focused DNB exam preparation — structured practice and review material. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
+                    Prep for DNB ↗
+                  </button>
+                </div>
+              </Card>
+            </div>
+          </div>
+          <AppFooter />
+        </div>
+      )}
       {product === "supersummary" && (
         <div style={{ minHeight: "100vh" }}>
-          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ background: "linear-gradient(120deg,#6E40C9,#9333EA)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(124,58,237,0.25)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 22 }}>📋</span>
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#6E40C9" }}>SuperSummary</h1>
-                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
+                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>SuperSummary</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
               </div>
             </div>
-            <ProductToggle product={product} setProduct={setProduct} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ProductToggle product={product} setProduct={setProduct} />
+              <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
+            </div>
           </div>
           <SuperSummary provider={provider} apiKey={apiKey} setSettingsOpen={setSettingsOpen} />
         </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { SYSTEM_TEMPLATES, emptyTemplate, parseTemplateParts, fillTemplate, SECTION_SEQUENCE } from "./templates.js";
 import { extractDocumentText } from "./ocr.js";
 import { callAIStream, parseJSON, getGenericInstructions, getDetailedInstructions } from "./api.js";
+import { CardCarousel, IllustDocs, IllustScan, IllustSafety } from "./HomeHero.jsx";
 
 const TEAL   = { primary: "#0F6E56", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
 const AMBER  = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
@@ -394,7 +395,7 @@ Rules:
           Paste one of your <strong>real discharge summaries</strong> below. Then <strong>select any words that change per patient</strong> (a value, the age, a duration) and click <strong>“+ Make blank”</strong>. Everything you don't mark stays fixed and prints exactly as written.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+        <div className="template-editor-grid" style={{ gap: 12, marginBottom: 14 }}>
           <input style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Template name (e.g. Neonatal Jaundice)" />
           <input style={inputS} value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" />
         </div>
@@ -417,9 +418,10 @@ Rules:
         {aiFindError && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>{aiFindError}</p>}
 
         <textarea ref={bodyRef} value={form.sampleBody} onSelect={captureSelection}
+          className="premium-textarea"
           onChange={e => setForm(f => ({ ...f, sampleBody: e.target.value.replace(/\r\n/g, "\n") }))}
           placeholder="Paste your discharge summary here…"
-          style={{ ...inputS, minHeight: 300, fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7, resize: "vertical" }} />
+          style={{ minHeight: 300, resize: "vertical" }} />
 
         {slotDraft && (
           <div style={{ background: PURPLE.bg, border: `1px solid ${PURPLE.border}`, borderRadius: 10, padding: 14, marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -430,7 +432,7 @@ Rules:
                 ✕
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="template-preview-grid" style={{ gap: 10 }}>
               <input style={inputS} autoFocus value={slotDraft.label} onChange={e => setSlotDraft(s => ({ ...s, label: e.target.value }))} placeholder="Label, e.g. TSB at admission" />
               <input style={inputS} value={slotDraft.ocrHints} onChange={e => setSlotDraft(s => ({ ...s, ocrHints: e.target.value }))} placeholder="OCR hints (optional): tsb, bilirubin" />
             </div>
@@ -479,13 +481,43 @@ Rules:
   );
 }
 
+// ─── How-to-use explainer carousel — image + caption rotate together ──────────
+const HOWTO_STEPS = [
+  { Illust: IllustDocs, title: "1. Paste a real summary", body: "Start from a discharge summary you've actually written — that becomes your template." },
+  { Illust: IllustScan, title: "2. Mark blanks, or just scan", body: "Highlight the words that change per patient, or snap report photos and let AI find them." },
+  { Illust: IllustSafety, title: "3. Generate & review", body: "The draft fills in seconds. AI Safety Check flags anything that needs a second look." },
+];
+function HowToUseCarousel() {
+  const [i, setI] = useState(0);
+  useEffect(() => { const t = setInterval(() => setI(v => (v + 1) % HOWTO_STEPS.length), 3400); return () => clearInterval(t); }, []);
+  const { Illust, title, body } = HOWTO_STEPS[i];
+  return (
+    <div style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 14, overflow: "hidden", display: "flex", flexWrap: "wrap" }}>
+      <div style={{ width: 180, flexShrink: 0, background: PURPLE.bg }}>
+        <div style={{ height: 130 }}><Illust /></div>
+      </div>
+      <div style={{ flex: 1, minWidth: 200, padding: "16px 20px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: PURPLE.primary, letterSpacing: 0.5, margin: "0 0 4px" }}>HOW TEMPLATES WORK</p>
+        <p style={{ fontSize: 15, fontWeight: 800, margin: "0 0 4px" }}>{title}</p>
+        <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.5 }}>{body}</p>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          {HOWTO_STEPS.map((_, n) => (
+            <span key={n} onClick={() => setI(n)} style={{ width: n === i ? 18 : 6, height: 6, borderRadius: 4, background: n === i ? PURPLE.primary : "var(--color-border-primary)", cursor: "pointer", transition: "all 0.3s" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Template Library ───────────────────────────────────────────────────────────
 function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartAiMode, hasKey }) {
-  const [tab, setTab] = useState("Public");
+  const [tab, setTab] = useState("AI");
   const [aiComplaint, setAiComplaint] = useState("");
   const source = tab === "Public" ? SYSTEM_TEMPLATES : tab === "AI" ? [] : customTemplates.filter(t => t.source === (tab === "My Templates" ? "private" : "community"));
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <HowToUseCarousel />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Template Library</h3>
         {tab !== "AI" && <Btn small onClick={() => onEdit(null)}>+ New Template</Btn>}
@@ -493,19 +525,20 @@ function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartA
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["Public", "My Templates", "Community", "AI"].map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-            borderColor: tab === t ? (t === "AI" ? "#5B5BDB" : PURPLE.primary) : "var(--color-border-primary)",
-            background: tab === t ? (t === "AI" ? "#1E1E2E" : PURPLE.bg) : "#fff",
-            color: tab === t ? (t === "AI" ? "#A5A5FF" : PURPLE.primary) : "var(--color-text-secondary)" }}>{t === "AI" ? "✨ AI Mode" : t}</button>
+            borderColor: tab === t ? (t === "AI" ? "#A855F7" : PURPLE.primary) : "var(--color-border-primary)",
+            background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : PURPLE.bg) : "#fff",
+            boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
+            color: tab === t ? (t === "AI" ? "#F3E8FF" : PURPLE.primary) : "var(--color-text-secondary)" }}>{t === "AI" ? "✨ AI Mode" : t}</button>
         ))}
       </div>
       {tab === "AI" ? (
-        <div style={{ background: "linear-gradient(135deg,#1E1E2E,#2A1A4E)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: "#E0E0FF", margin: 0 }}>✨ No template? Let AI draft one.</p>
-          <p style={{ fontSize: 12, color: "#9090C0", margin: 0 }}>Type the diagnosis — AI drafts a typical summary instantly; refine with photos or notes.</p>
+        <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: "#F3E8FF", margin: 0 }}>✨ No template? Let AI draft one.</p>
+          <p style={{ fontSize: 12, color: "#D8B4FE", margin: 0 }}>Type the diagnosis — AI drafts a typical summary instantly; refine with photos or notes.</p>
           <input value={aiComplaint} onChange={e => setAiComplaint(e.target.value)} placeholder="e.g. Nephrotic syndrome relapse"
-            style={{ padding: "9px 12px", border: "1.5px solid #5B5BDB", borderRadius: 8, fontSize: 14, outline: "none", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
-          {!hasKey && <p style={{ fontSize: 11, color: "#5050A0", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>}
-          <Btn disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())} style={{ background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff", alignSelf: "flex-start" }}>
+            style={{ padding: "9px 12px", border: "1.5px solid #A855F7", borderRadius: 8, fontSize: 14, outline: "none", background: "rgba(255,255,255,0.08)", color: "#F3E8FF", boxSizing: "border-box" }} />
+          {!hasKey && <p style={{ fontSize: 11, color: "#c4b5fd", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>}
+          <Btn disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())} style={{ background: hasKey ? "#8B5CF6" : "#4c1d5580", color: "#fff", alignSelf: "flex-start" }}>
             {!hasKey ? "⚠ Add API Key First" : "✨ Draft it →"}
           </Btn>
         </div>
@@ -1835,7 +1868,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                 {gapInvestigations.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, borderTop: "1px solid var(--color-border-primary)", paddingTop: 14, marginTop: 10 }}>
                     <p style={{ fontSize: 13, fontWeight: 700, color: PURPLE.primary, margin: 0 }}>🧪 Investigations & Lab Gaps</p>
-                    <div style={{ padding: 12, background: "rgba(91,91,219,0.05)", border: "1px dashed #5B5BDB", borderRadius: 8, margin: "6px 0 10px" }}>
+                    <div style={{ padding: 12, background: "rgba(139,92,246,0.06)", border: "1px dashed #8B5CF6", borderRadius: 8, margin: "6px 0 10px" }}>
                       <DocumentIntake docs={investigations} setDocs={setInvestigations} provider={provider} apiKey={apiKey} isInvestigation />
                     </div>
                     {gapInvestigations.map(renderGapItem)}
@@ -1908,6 +1941,18 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             </Btn>
             <Btn variant="secondary" small onClick={() => { navigator.clipboard?.writeText(summaryText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} disabled={generatingSummary}>
               {copied ? "✓ Copied!" : "Copy Summary"}
+            </Btn>
+            <Btn variant="secondary" small onClick={() => {
+              const filename = `${confirmedDiagnosis.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_discharge_summary.txt`;
+              const element = document.createElement("a");
+              const file = new Blob([summaryText], { type: "text/plain;charset=utf-8" });
+              element.href = URL.createObjectURL(file);
+              element.download = filename;
+              document.body.appendChild(element);
+              element.click();
+              document.body.removeChild(element);
+            }} disabled={generatingSummary}>
+              📥 Download TXT
             </Btn>
             <Btn onClick={() => setWizardSaveModal(true)} disabled={generatingSummary || !summaryText.trim()}>
               💾 Save as Template
@@ -2013,6 +2058,16 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="secondary" small onClick={handleCopy} disabled={loading}>{copied ? "✓ Copied!" : "Copy"}</Btn>
+          <Btn variant="secondary" small onClick={() => {
+            const filename = `${complaint.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_draft.txt`;
+            const element = document.createElement("a");
+            const file = new Blob([text], { type: "text/plain;charset=utf-8" });
+            element.href = URL.createObjectURL(file);
+            element.download = filename;
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+          }} disabled={loading}>📥 Download TXT</Btn>
           <Btn small onClick={onDone} disabled={loading}>Finish</Btn>
           <Btn variant="ghost" small onClick={onCancel}>Cancel</Btn>
         </div>
@@ -2034,7 +2089,7 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
       <Card style={{ padding: 20 }}>
         {loading ? <p style={{ fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center", padding: 40 }}>✨ Drafting…</p>
           : error ? <div><p style={{ fontSize: 14, color: AMBER.text, margin: "0 0 12px" }}>{error}</p><Btn small onClick={generate}>Retry</Btn></div>
-          : editing ? <textarea value={text} onChange={e => setText(e.target.value)} style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
+          : editing ? <textarea className="premium-textarea" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 440, resize: "vertical" }} />
           : <pre style={{ fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap", margin: 0 }}>{text}</pre>}
       </Card>
       {!loading && !error && <Btn variant="secondary" small onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "✏️ Edit"}</Btn>}
