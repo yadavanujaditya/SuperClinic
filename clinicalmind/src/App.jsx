@@ -3,7 +3,7 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
-import HomeHero from "./HomeHero.jsx";
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, AppFooter } from "./HomeHero.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -1068,9 +1068,46 @@ function ProductToggle({ product, setProduct }) {
   );
 }
 
+// ─── Profile Modal ────────────────────────────────────────────────────────────
+function ProfileModal({ onClose, onSettings }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
+        <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+        </div>
+        <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
+          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", padding: 18, textAlign: "center" }}>
+            <p style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>Attending Doctor</p>
+            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>Indian Government Hospital OPD</p>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div style={{ flex: 1, background: TEAL.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🔒</p>
+              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>On-device only</p>
+            </div>
+            <div style={{ flex: 1, background: PURPLE.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>⚡</p>
+              <p style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>v1.0 ClinicFlow</p>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
+            No account needed — your patient data and API keys never leave this device.
+          </p>
+          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ⚙️ Open Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Profile Menu ─────────────────────────────────────────────────────────────
 function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   const [open, setOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const ref = useRef();
 
   useEffect(() => {
@@ -1087,13 +1124,17 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button onClick={() => setOpen(v => !v)}
-        style={{ width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${TEAL.border}`, background: TEAL.bg,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer" }}>
+        style={{ width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
         🧑‍⚕️
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", borderRadius: 12,
-          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 190, overflow: "hidden", zIndex: 60 }}>
+          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 200, overflow: "hidden", zIndex: 60 }}>
+          <button onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
+            <span>👤 View Profile</span>
+          </button>
+          <div style={{ height: 1, background: "var(--color-border-primary)" }} />
           <button onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
             <span>📚 Tag Library</span>
             {tagCount > 0 && <span style={{ fontSize: 11, background: TEAL.bg, color: TEAL.primary, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{tagCount}</span>}
@@ -1104,6 +1145,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
           </button>
         </div>
       )}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} onSettings={onSettings} />}
     </div>
   );
 }
@@ -1198,12 +1240,12 @@ Return ONLY valid JSON with this exact structure:
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div className="hero-band" style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🩺</span>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: TEAL.primary }}>ClinicFlow</h1>
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Indian OPD</p>
+            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>ClinicFlow</h1>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Indian OPD</p>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -1306,6 +1348,11 @@ Return ONLY valid JSON with this exact structure:
                   transition: "all 0.15s"
                 }}
               >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M4 6 C10 2 18 2 24 6 V30 C18 26 10 26 4 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : "#94a3b8"} opacity="0.85" />
+                  <path d="M44 6 C38 2 30 2 24 6 V30 C30 26 38 26 44 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B8BFF" : TEAL.light) : "#cbd5e1"} />
+                  <line x1="24" y1="6" x2="24" y2="30" stroke="#fff" strokeWidth="1.5" opacity="0.6" />
+                </svg>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 14 }}>📖</span>
                   <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "learning" ? (isAiMode ? "#A5A5FF" : TEAL.primary) : "var(--color-text-primary)" }}>Learning Mode</span>
@@ -1331,6 +1378,10 @@ Return ONLY valid JSON with this exact structure:
                   transition: "all 0.15s"
                 }}
               >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M27 2 L10 20 h9 l-4 14 L33 16 h-9 Z" fill={consultMode === "opd" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : "#94a3b8"} />
+                  <circle cx="24" cy="18" r="16" fill="none" stroke={consultMode === "opd" ? (isAiMode ? "#5B5BDB" : TEAL.light) : "#cbd5e1"} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
+                </svg>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 14 }}>⚡</span>
                   <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "opd" ? (isAiMode ? "#A5A5FF" : TEAL.primary) : "var(--color-text-primary)" }}>OPD Mode</span>
@@ -2766,19 +2817,20 @@ export default function App() {
       />
       {product === null && (
         <div style={{ minHeight: "100vh", background: "var(--color-background-primary)", display: "flex", flexDirection: "column" }}>
-          {/* Header */}
-          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}>
+          {/* Header — premium gradient */}
+          <div className="hero-band" style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 26 }}>⚡</span>
               <div>
-                <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "var(--color-text-primary)", letterSpacing: "-0.5px" }}>ClinicFlow</h1>
-                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0, fontWeight: 500 }}>Comprehensive Clinical Intelligence Suite</p>
+                <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#fff", letterSpacing: "-0.5px" }}>ClinicFlow</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0, fontWeight: 500 }}>Comprehensive Clinical Intelligence Suite</p>
               </div>
             </div>
+            <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
           </div>
 
           {/* Main Dashboard Cards Container */}
-          <div style={{ flex: 1, padding: "32px 20px 56px", width: "100%", maxWidth: 1040, margin: "0 auto" }}>
+          <div style={{ flex: 1, padding: "32px 20px 0", width: "100%", maxWidth: 1040, margin: "0 auto" }}>
             {/* Animated premium hero carousel */}
             <HomeHero />
 
@@ -2789,11 +2841,11 @@ export default function App() {
               </div>
             </div>
 
-            <div className="library-grid anim-fade-up" style={{ width: "100%" }}>
+            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(3, 1fr)" }}>
               {/* Card 1: ClinicFlow */}
               <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
-                <div style={{ height: 200, overflow: "hidden", background: "#f0fdfa", display: "flex", justifyContent: "center", alignItems: "center", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
-                  <img src="/clinicflow_card_image.png" alt="ClinicFlow" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
+                  <CardCarousel accent="#0d9488" slides={[IllustConsult, IllustDifferential, IllustSafety]} />
                 </div>
                 <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -2811,8 +2863,8 @@ export default function App() {
 
               {/* Card 2: SuperSummary */}
               <Card onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
-                <div style={{ height: 200, overflow: "hidden", background: "#f5f3ff", display: "flex", justifyContent: "center", alignItems: "center", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
-                  <img src="/supersummary_card_image.png" alt="SuperSummary" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <div style={{ background: "#f5f3ff", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
+                  <CardCarousel accent="#7c3aed" slides={[IllustDocs, IllustScan]} />
                 </div>
                 <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -2827,21 +2879,44 @@ export default function App() {
                   </button>
                 </div>
               </Card>
+
+              {/* Card 3: SuperMemory — your reference library, surfaced right on the home page */}
+              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
+                <div style={{ background: "#fff7ed", borderBottom: "1px solid rgba(245, 158, 11, 0.1)" }}>
+                  <CardCarousel accent="#f59e0b" slides={[IllustLibrary, IllustDocs]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>✨</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#b45309", margin: 0 }}>SuperMemory</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Your textbooks and hospital protocols, AI-indexed. Upload once, then search or jump to the exact page mid-consult — fully offline.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
+                    Open SuperMemory →
+                  </button>
+                </div>
+              </Card>
             </div>
           </div>
+          <AppFooter />
         </div>
       )}
       {product === "supersummary" && (
         <div style={{ minHeight: "100vh" }}>
-          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ background: "linear-gradient(120deg,#6E40C9,#9333EA)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(124,58,237,0.25)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 22 }}>📋</span>
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#6E40C9" }}>SuperSummary</h1>
-                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
+                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>SuperSummary</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
               </div>
             </div>
-            <ProductToggle product={product} setProduct={setProduct} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ProductToggle product={product} setProduct={setProduct} />
+              <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
+            </div>
           </div>
           <SuperSummary provider={provider} apiKey={apiKey} setSettingsOpen={setSettingsOpen} />
         </div>

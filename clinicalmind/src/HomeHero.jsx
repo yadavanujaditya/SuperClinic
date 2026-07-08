@@ -111,3 +111,139 @@ export default function HomeHero() {
     </div>
   );
 }
+
+// ─── Small illustrated slide art (self-contained SVG — no external image deps) ──
+function IllustBase({ bg, children }) {
+  return (
+    <svg viewBox="0 0 300 200" width="100%" height="100%" preserveAspectRatio="xMidYMid slice">
+      <rect width="300" height="200" fill={bg} />
+      {children}
+    </svg>
+  );
+}
+export function IllustConsult() {
+  return (
+    <IllustBase bg="#f0fdfa">
+      <circle cx="150" cy="100" r="70" fill="#ccfbf1" />
+      <circle cx="118" cy="86" r="30" fill="#fff" />
+      <path d="M88 150 q30 -34 60 0 z" fill="#0d9488" />
+      <rect x="150" y="60" width="86" height="70" rx="10" fill="#fff" stroke="#99f6e4" strokeWidth="2" />
+      <rect x="162" y="74" width="62" height="6" rx="3" fill="#0d9488" />
+      <rect x="162" y="88" width="46" height="6" rx="3" fill="#99f6e4" />
+      <rect x="162" y="102" width="54" height="6" rx="3" fill="#99f6e4" />
+      <circle cx="205" cy="118" r="8" fill="#14b8a6" />
+    </IllustBase>
+  );
+}
+export function IllustDifferential() {
+  return (
+    <IllustBase bg="#ecfeff">
+      <circle cx="150" cy="100" r="52" fill="none" stroke="#0d9488" strokeWidth="3" strokeDasharray="4 6" />
+      <circle cx="150" cy="70" r="10" fill="#0d9488" />
+      <circle cx="120" cy="120" r="8" fill="#14b8a6" />
+      <circle cx="180" cy="120" r="8" fill="#5eead4" />
+      <path d="M150 70 L120 120 M150 70 L180 120 M120 120 L180 120" stroke="#0d9488" strokeWidth="2" opacity="0.5" />
+      <rect x="60" y="150" width="180" height="10" rx="5" fill="#fff" />
+      <rect x="60" y="150" width="120" height="10" rx="5" fill="#0d9488" />
+    </IllustBase>
+  );
+}
+export function IllustDocs() {
+  return (
+    <IllustBase bg="#f5f3ff">
+      <rect x="90" y="50" width="70" height="96" rx="6" fill="#fff" stroke="#c4b5fd" strokeWidth="2" transform="rotate(-8 125 98)" />
+      <rect x="120" y="60" width="80" height="100" rx="6" fill="#fff" stroke="#7c3aed" strokeWidth="2" />
+      <rect x="135" y="76" width="50" height="6" rx="3" fill="#7c3aed" />
+      <rect x="135" y="90" width="50" height="5" rx="2.5" fill="#ddd6fe" />
+      <rect x="135" y="100" width="34" height="5" rx="2.5" fill="#ddd6fe" />
+      <circle cx="196" cy="140" r="16" fill="#7c3aed" />
+      <path d="M189 140 l5 5 l10 -11" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </IllustBase>
+  );
+}
+export function IllustScan() {
+  return (
+    <IllustBase bg="#faf5ff">
+      <rect x="80" y="50" width="90" height="110" rx="8" fill="#fff" stroke="#c4b5fd" strokeWidth="2" />
+      <rect x="94" y="66" width="62" height="6" rx="3" fill="#a78bfa" />
+      <rect x="94" y="80" width="46" height="5" rx="2.5" fill="#e9d5ff" />
+      <rect x="94" y="92" width="54" height="5" rx="2.5" fill="#e9d5ff" />
+      <rect x="94" y="104" width="40" height="5" rx="2.5" fill="#e9d5ff" />
+      <rect x="170" y="70" width="60" height="80" rx="8" fill="#7c3aed" opacity="0.9" />
+      <path d="M180 84 h40 M180 98 h40 M180 112 h28" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="205" cy="132" r="10" fill="#fff" />
+      <path d="M201 132 l3 3 l6 -7" stroke="#7c3aed" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </IllustBase>
+  );
+}
+export function IllustLibrary() {
+  return (
+    <IllustBase bg="#fff7ed">
+      <rect x="70" y="120" width="24" height="50" rx="2" fill="#f59e0b" />
+      <rect x="98" y="100" width="24" height="70" rx="2" fill="#fbbf24" />
+      <rect x="126" y="80" width="24" height="90" rx="2" fill="#f59e0b" />
+      <rect x="154" y="110" width="24" height="60" rx="2" fill="#fde68a" />
+      <circle cx="205" cy="90" r="34" fill="#fff" stroke="#f59e0b" strokeWidth="2" />
+      <circle cx="196" cy="82" r="10" fill="none" stroke="#f59e0b" strokeWidth="3" />
+      <line x1="204" y1="90" x2="216" y2="102" stroke="#f59e0b" strokeWidth="3" strokeLinecap="round" />
+    </IllustBase>
+  );
+}
+export function IllustSafety() {
+  return (
+    <IllustBase bg="#fef2f2">
+      <path d="M150 40 L200 58 V100 C200 132 178 154 150 164 C122 154 100 132 100 100 V58 Z" fill="#fee2e2" stroke="#e11d48" strokeWidth="2.5" />
+      <path d="M132 100 l14 14 l24 -30" stroke="#e11d48" strokeWidth="6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </IllustBase>
+  );
+}
+
+// Small auto-rotating illustration carousel used inside a card (replaces a single static image).
+export function CardCarousel({ slides, accent = "#0d9488", height = 170 }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setI(v => (v + 1) % slides.length), 3200);
+    return () => clearInterval(t);
+  }, [slides.length]);
+  return (
+    <div style={{ position: "relative", height, overflow: "hidden" }}>
+      {slides.map((Slide, n) => (
+        <div key={n} style={{ position: "absolute", inset: 0, opacity: n === i ? 1 : 0, transition: "opacity 0.6s ease" }}>
+          <Slide />
+        </div>
+      ))}
+      <div style={{ position: "absolute", bottom: 8, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 5 }}>
+        {slides.map((_, n) => (
+          <span key={n} style={{ width: n === i ? 16 : 6, height: 6, borderRadius: 4, background: n === i ? accent : "rgba(0,0,0,0.15)", transition: "all 0.3s" }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Footer ─────────────────────────────────────────────────────────────────────
+export function AppFooter() {
+  return (
+    <footer style={{ marginTop: 48, borderTop: "1px solid var(--color-border-primary)", background: "#fff" }}>
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "32px 20px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 22 }}>⚡</span>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 800, margin: 0, color: "var(--color-text-primary)" }}>ClinicFlow</p>
+            <p style={{ fontSize: 11.5, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Built for junior doctors in Indian government hospitals — all processing stays on your device.</p>
+          </div>
+        </div>
+        <a href="https://t.me/yadavanujaditya" target="_blank" rel="noopener noreferrer"
+          className="lift-on-hover"
+          style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", padding: "10px 18px", borderRadius: 30,
+            background: "linear-gradient(120deg,#2AABEE,#229ED9)", color: "#fff", fontWeight: 700, fontSize: 13.5, boxShadow: "0 8px 20px rgba(34,158,217,0.28)" }}>
+          <svg width="20" height="20" viewBox="0 0 496 512" fill="#fff"><path d="M248 8C111 8 0 119 0 256s111 248 248 248 248-111 248-248S385 8 248 8zm121.8 169.9l-40.7 191.8c-3.1 13.8-11.1 17.2-22.6 10.7l-62.5-46.1-30.1 29c-3.3 3.3-6.1 6.1-12.6 6.1l4.5-63.9L328 178.1c5.1-4.5-1.1-7-7.9-2.5L163.6 274l-61.2-19.1c-13.3-4.2-13.6-13.3 2.8-19.7l239.4-92.3c11.1-4 20.8 2.7 17.2 19.5z"/></svg>
+          Chat on Telegram · @yadavanujaditya
+        </a>
+      </div>
+      <div style={{ borderTop: "1px solid var(--color-border-primary)", padding: "14px 20px", textAlign: "center" }}>
+        <p style={{ fontSize: 11.5, color: "var(--color-text-secondary)", margin: 0 }}>© {new Date().getFullYear()} ClinicFlow · Made with care for India's frontline doctors</p>
+      </div>
+    </footer>
+  );
+}
