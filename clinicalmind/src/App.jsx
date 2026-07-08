@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js";
-import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote } from "./api.js";
+import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 
@@ -163,14 +163,28 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
   const [saved, setSaved] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
-  // Sync draft when provider or currentKey changes
-  useEffect(() => { setDraft(currentKey); }, [provider, currentKey]);
+  const [genericInst, setGenericInst] = useState("");
+  const [detailedInst, setDetailedInst] = useState("");
+
+  // Sync draft and instructions when panel opens or settings change
+  useEffect(() => {
+    setDraft(currentKey);
+    setGenericInst(getGenericInstructions());
+    setDetailedInst(getDetailedInstructions());
+  }, [provider, currentKey, open]);
 
   const valid = draft.length > 4 && draft.startsWith(p.keyPrefix);
 
   const save = () => {
     saveApiKey(provider, draft);
     setCurrentKey(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const saveInstructions = () => {
+    localStorage.setItem("clinicalmind:instructions:generic", genericInst);
+    localStorage.setItem("clinicalmind:instructions:detailed", detailedInst);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -221,7 +235,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
             </button>
           </div>
           {draft && !valid && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
-          {saved && <p style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Key saved</p>}
+          {saved && <p style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
           <Btn onClick={save} disabled={!valid} small>Save Key</Btn>
           {draft && apiKeyFor(provider) && (
             <button onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
@@ -229,6 +243,50 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
               Remove key
             </button>
           )}
+        </div>
+
+        {/* Admin: Agent Instructions */}
+        <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 12px", color: TEAL.primary }}>Admin: Agent Instructions</h3>
+          
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Generic Mode Instructions</label>
+            <textarea
+              value={genericInst}
+              onChange={e => setGenericInst(e.target.value)}
+              rows={8}
+              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 11, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box", resize: "vertical" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Detailed Mode Instructions</label>
+            <textarea
+              value={detailedInst}
+              onChange={e => setDetailedInst(e.target.value)}
+              rows={8}
+              style={{ width: "100%", padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 11, fontFamily: "var(--font-mono)", outline: "none", boxSizing: "border-box", resize: "vertical" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Btn onClick={saveInstructions} small>Save Instructions</Btn>
+            <button
+              onClick={() => {
+                if (window.confirm("Are you sure you want to reset instructions to default?")) {
+                  localStorage.removeItem("clinicalmind:instructions:generic");
+                  localStorage.removeItem("clinicalmind:instructions:detailed");
+                  setGenericInst(getGenericInstructions());
+                  setDetailedInst(getDetailedInstructions());
+                  setSaved(true);
+                  setTimeout(() => setSaved(false), 2000);
+                }
+              }}
+              style={{ background: "none", border: "none", color: RED.primary, fontSize: 12, cursor: "pointer", fontFamily: "var(--font-sans)", fontWeight: 500 }}
+            >
+              Reset to Default
+            </button>
+          </div>
         </div>
 
         <div style={{ background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 10, padding: "12px 14px" }}>

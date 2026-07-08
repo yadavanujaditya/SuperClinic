@@ -210,6 +210,11 @@ export function parseJSON(raw) {
   
   try { return JSON.parse(text); } catch (_) {}
 
+  const bracketMatch = text.match(/\[[\s\S]*\]/);
+  if (bracketMatch) {
+    try { return JSON.parse(bracketMatch[0]); } catch (_) {}
+  }
+
   const braceMatch = text.match(/\{[\s\S]*\}/);
   if (braceMatch) {
     try { return JSON.parse(braceMatch[0]); } catch (_) {}
@@ -357,4 +362,72 @@ ${redFlags.length > 0 ? "⚠️ Red flags identified — consider urgent referra
 • Follow-up as clinically indicated
 
 [Note generated locally — no AI used]`;
+}
+
+export const DEFAULT_GENERIC_INSTRUCTIONS = `1. Provide only the minimal core clinical details needed for a basic discharge summary. You must include Chief Complaint, brief HPI, essential vitals/labs, and short review advice. CRITICAL: The TREATMENT GIVEN section MUST detail all specific treatments administered to the patient during their stay (such as IV fluids, specific medications like antiemetics/antibiotics, oxygen therapy, or surgery). The COURSE OF TREATMENT IN HOSPITAL section must contain details of the clinical course and general hospital stay. Do NOT omit or summarize away any administered treatments.
+2. Keep it concise, direct, and under 3-4 short paragraphs.
+3. The DIAGNOSIS section MUST use exactly TWO separate headings in this order:
+
+   DIAGNOSIS
+   [Clinical description of the condition, e.g.: Acute Infective Hepatitis with signs of liver cell failure, ascitis]
+
+   PRIMARY DIAGNOSIS
+   ICD-10 Code: B15.9 (Hepatitis A without hepatic coma)
+   ICD-10 Code: K72.0 (Acute and subacute hepatic failure)
+   ICD-10 Code: R17 (Unspecified jaundice)
+
+   ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
+3a. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
+3b. For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
+4. If there are any patient reports, laboratory investigations, or clinical tests, CRITICAL RULE: the INVESTIGATIONS section must ONLY contain tests that were actually performed AND have an available result/value. NEVER list a test that is merely "Advised", ordered, planned, pending, awaited, or has no result — omit those entirely. If no investigation has an actual result, omit the INVESTIGATIONS section completely. For the tests that DO have results, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
+5. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
+5. You MUST include and use these exact clean, standard uppercase section headers:
+   DIAGNOSIS
+   CHIEF COMPLAINT
+   HISTORY OF PRESENT ILLNESS
+   INVESTIGATIONS
+   TREATMENT GIVEN
+   COURSE OF TREATMENT IN HOSPITAL
+   TREATMENT ADVICE AT DISCHARGE
+   NEXT REVIEW
+6. Output ONLY the plain text summary. No introduction, markdown code fences, or comments.`;
+
+export const DEFAULT_DETAILED_INSTRUCTIONS = `1. Provide a comprehensive, in-depth discharge summary. Elaborate fully on history (HPI), general/systemic examinations, complete investigations trends, detailed hospital course (treatments, boluses, transfusions), and structured discharge warnings/screenings.
+2. Use professional medical terminology and ensure a cohesive, professional narrative.
+3. The DIAGNOSIS section MUST use exactly TWO separate headings in this order:
+
+   DIAGNOSIS
+   [Clinical description of the condition, e.g.: Acute Infective Hepatitis with signs of liver cell failure, ascitis]
+
+   PRIMARY DIAGNOSIS
+   ICD-10 Code: B15.9 (Hepatitis A without hepatic coma)
+   ICD-10 Code: K72.0 (Acute and subacute hepatic failure)
+   ICD-10 Code: R17 (Unspecified jaundice)
+   ICD-10 Code: R60.0 (Localized edema)
+
+   ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
+3a. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
+3b. For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
+4. If there are any patient reports, laboratory investigations, or clinical tests, CRITICAL RULE: the INVESTIGATIONS section must ONLY contain tests that were actually performed AND have an available result/value. NEVER list a test that is merely "Advised", ordered, planned, pending, awaited, or has no result — omit those entirely. If no investigation has an actual result, omit the INVESTIGATIONS section completely. For the tests that DO have results, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
+5. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
+5. Use clean, standard uppercase section headers:
+   DIAGNOSIS
+   CHIEF COMPLAINT
+   HISTORY OF PRESENT ILLNESS
+   GENERAL EXAMINATION
+   VITALS
+   SYSTEMIC EXAMINATION
+   INVESTIGATIONS
+   TREATMENT GIVEN
+   COURSE OF TREATMENT IN HOSPITAL
+   TREATMENT ADVICE AT DISCHARGE
+   NEXT REVIEW
+6. Output ONLY the plain text summary. No introduction, markdown code fences, or comments.`;
+
+export function getGenericInstructions() {
+  return localStorage.getItem("clinicalmind:instructions:generic") || DEFAULT_GENERIC_INSTRUCTIONS;
+}
+
+export function getDetailedInstructions() {
+  return localStorage.getItem("clinicalmind:instructions:detailed") || DEFAULT_DETAILED_INSTRUCTIONS;
 }

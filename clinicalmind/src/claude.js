@@ -51,6 +51,11 @@ export function parseJSON(raw) {
   
   try { return JSON.parse(text); } catch (_) {}
 
+  const bracketMatch = text.match(/\[[\s\S]*\]/);
+  if (bracketMatch) {
+    try { return JSON.parse(bracketMatch[0]); } catch (_) {}
+  }
+
   const braceMatch = text.match(/\{[\s\S]*\}/);
   if (braceMatch) {
     try { return JSON.parse(braceMatch[0]); } catch (_) {}

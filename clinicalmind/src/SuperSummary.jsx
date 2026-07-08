@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { SYSTEM_TEMPLATES, emptyTemplate, parseTemplateParts, fillTemplate, SECTION_SEQUENCE } from "./templates.js";
 import { extractDocumentText } from "./ocr.js";
-import { callAIStream, parseJSON } from "./api.js";
+import { callAIStream, parseJSON, getGenericInstructions, getDetailedInstructions } from "./api.js";
 
 const TEAL   = { primary: "#0F6E56", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
 const AMBER  = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
@@ -322,23 +322,36 @@ Rules:
 - 5-15 slots. No markdown.`;
       let raw = "";
       await callAIStream([{ role: "user", content: prompt }],
-        "You are a clinical template annotator. Output only valid JSON.", provider, apiKey, t => { raw = t; });
+        "You are a clinical template annotator. Output only valid JSON, nothing else.", provider, apiKey, t => { raw = t; });
       const parsed = parseJSON(raw);
-      if (!parsed?.slots?.length) { setAiFindError("AI could not identify questions — try selecting text manually."); return; }
-      
+      let slots = null;
+      if (parsed) {
+        if (Array.isArray(parsed)) {
+          slots = parsed;
+        } else if (Array.isArray(parsed.slots)) {
+          slots = parsed.slots;
+        }
+      }
+      if (!slots || !slots.length) {
+        const snippet = (raw || "").trim().slice(0, 120);
+        setAiFindError(snippet ? `AI didn't return usable questions. It said: "${snippet}${raw.length > 120 ? "…" : ""}". Try again, or select text manually.` : "AI returned an empty response — try again, or select text manually.");
+        return;
+      }
       let body = form.sampleBody.replace(/\r\n/g, "\n");
       const newSlots = [];
-      for (const s of parsed.slots) {
-        if (!s.find) continue;
+      let missed = 0;
+      for (const s of slots) {
+        if (!s.find) { missed++; continue; }
         const matchedSubstring = findFlexibleSubstring(body, s.find);
-        if (!matchedSubstring) continue;
+        if (!matchedSubstring || matchedSubstring.includes("{{")) { missed++; continue; }
         const key = (s.label || s.find).toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24) + "_" + Math.random().toString(36).slice(2, 4);
         body = s.global ? body.split(matchedSubstring).join(`{{${key}}}`) : body.replace(matchedSubstring, `{{${key}}}`);
         newSlots.push({ key, label: s.label || s.find, question: s.question || (s.label || s.find) + "?", mandatory: false, default: matchedSubstring, ocrHints: [], options: Array.isArray(s.options) ? s.options : [] });
       }
-      if (!newSlots.length) { setAiFindError("AI's suggestions didn't match the text exactly — try manual selection."); return; }
+      if (!newSlots.length) { setAiFindError(`AI suggested ${slots.length} question(s) but none matched the text. Try again, or select text manually and use "+ Make blank".`); return; }
       setForm(f => ({ ...f, sampleBody: body, slots: [...f.slots, ...newSlots] }));
-    } catch (e) { setAiFindError(e.message); }
+      setAiFindError(missed ? `Added ${newSlots.length} question(s). ${missed} suggestion(s) couldn't be matched — add those manually.` : "");
+    } catch (e) { setAiFindError(`Error: ${e.message}`); }
     finally { setAiFinding(false); }
   };
 
@@ -454,9 +467,11 @@ Rules:
               </Btn>
             )}
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            {!form.name.trim() && form.sampleBody.trim() && <span style={{ fontSize: 12, color: AMBER.text }}>← enter a name to save</span>}
             <Btn variant="ghost" onClick={onClose} small>Cancel</Btn>
-            <Btn onClick={save} disabled={!form.name || !form.sampleBody.trim()}>Save Template</Btn>
+            {/* Enabled as soon as there's body text — questions are optional; save() validates the name. */}
+            <Btn onClick={save} disabled={!form.sampleBody.trim()}>Save Template</Btn>
           </div>
         </div>
       </div>
@@ -714,9 +729,9 @@ ${extraText}
 
 INSTRUCTIONS:
 1. Analyze the additional details (e.g., lab report findings, positive/negative tests like DCT positive, PBF for hemolysis positive, vomiting history, dates/times).
-2. Intelligently merge these details into the appropriate sections of the existing discharge summary (e.g., Clinical History, Investigations, Course in Hospital, or Treatment Advice). Do not just append them; weave them naturally, chronologically, and professionally into the narrative.
+2. Intelligently merge these details into the appropriate sections of the existing discharge summary (e.g., Clinical History, Investigations, Treatment Given, Course in Hospital, or Treatment Advice). Do not just append them; weave them naturally, chronologically, and professionally into the narrative. CRITICAL: Ensure that all specific treatments given (e.g., antiemetics, intravenous fluids, specific medications, oxygen, or surgeries) are fully documented in the TREATMENT GIVEN or COURSE OF TREATMENT IN HOSPITAL sections. Do not summarize them away or omit them.
 3. If new symptoms or complications are mentioned (e.g., vomiting from 2 days), add them to the CHIEF COMPLAINT or HISTORY OF PRESENT ILLNESS.
-4. If new investigations or results are mentioned (e.g., DCT positive, PBF positive), add them to the INVESTIGATIONS or COURSE OF TREATMENT IN HOSPITAL.
+4. If new investigations WITH RESULTS are mentioned (e.g., DCT positive, PBF positive, Hb 8.1), add them to the INVESTIGATIONS, TREATMENT GIVEN, or COURSE OF TREATMENT IN HOSPITAL. CRITICAL: the INVESTIGATIONS section must ONLY contain tests that were actually performed and have a result/value — NEVER include tests that are merely "Advised", ordered, planned, or pending. Remove any such advised/pending entries if present.
 5. Maintain the professional medical tone, formatting, and layout of the original summary. Do not fabricate details.
 6. Output ONLY the complete, refined discharge summary text. Do not include any introduction, formatting like markdown code blocks, or comments. Just output the final plain text summary.`;
 
@@ -1329,9 +1344,9 @@ Suggest ALL missing relevant parameters in a single response (up to 10-12 parame
 COMPILED PATIENT DETAILS & ANSWERS:
 ${memoryText}
 
-Identify which minimal core parameters (e.g., primary discharge vital, key outcome parameter, or feeding/activity status) are still MISSING or UNKNOWN. For each missing core parameter, provide:
-- A short key (e.g. "feeding_status", "weight_discharge")
-- A clear label (e.g. "Feeding status at discharge")
+Identify which minimal core parameters (e.g., primary discharge vital, key outcome parameter, feeding/activity status, or details of treatment given/hospital course) are still MISSING or UNKNOWN. For each missing core parameter, provide:
+- A short key (e.g. "feeding_status", "treatment_given")
+- A clear label (e.g. "Feeding status at discharge", "Course of treatment in hospital")
 - A list of typical options (2 to 4 options) OR empty list for text.
 
 Return ONLY a valid JSON object of this structure:
@@ -1428,9 +1443,10 @@ INSTRUCTIONS:
    ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
 5a. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only (e.g., HEART RATE, PRIMARY DIAGNOSIS).
 5b. For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
-6. If there are any patient reports, laboratory investigations, or clinical tests, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
+6. If there are any patient reports, laboratory investigations, or clinical tests, CRITICAL RULE: the INVESTIGATIONS section must ONLY contain tests that were actually performed AND have an available result/value. NEVER list a test that is merely "Advised", ordered, planned, pending, awaited, or has no result — omit those entirely. If no investigation has an actual result, omit the INVESTIGATIONS section completely. For the tests that DO have results, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
 7. Output ONLY the completed, refined discharge summary text. Do not include any introduction, formatting like markdown code blocks, or comments. Just output the final plain text summary.`;
     } else if (summaryType === "generic") {
+      const genericInstructions = getGenericInstructions();
       prompt = `You are a senior medical consultant. Write a CONCISE, minimal, safe discharge summary for the patient.
 
 CONFIRMED DIAGNOSIS: ${confirmedDiagnosis}
@@ -1443,33 +1459,9 @@ CHECKLIST ANSWERS:
 ${filledAnswersText}
 
 INSTRUCTIONS:
-1. Provide only the minimal core clinical details needed for a basic discharge summary (Chief Complaint, brief HPI, essential vitals/labs, main treatment, and short review advice).
-2. Keep it concise, direct, and under 3-4 short paragraphs.
-3. The DIAGNOSIS section MUST use exactly TWO separate headings in this order:
-
-   DIAGNOSIS
-   [Clinical description of the condition, e.g.: Acute Infective Hepatitis with signs of liver cell failure, ascitis]
-
-   PRIMARY DIAGNOSIS
-   ICD-10 Code: B15.9 (Hepatitis A without hepatic coma)
-   ICD-10 Code: K72.0 (Acute and subacute hepatic failure)
-   ICD-10 Code: R17 (Unspecified jaundice)
-
-   ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
-3a. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
-3b. For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
-4. If there are any patient reports, laboratory investigations, or clinical tests, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
-5. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
-5. Use clean, standard uppercase section headers:
-   DIAGNOSIS
-   CHIEF COMPLAINT
-   HISTORY OF PRESENT ILLNESS
-   INVESTIGATIONS
-   COURSE OF TREATMENT IN HOSPITAL
-   TREATMENT ADVICE AT DISCHARGE
-   NEXT REVIEW
-6. Output ONLY the plain text summary. No introduction, markdown code fences, or comments.`;
+${genericInstructions}`;
     } else {
+      const detailedInstructions = getDetailedInstructions();
       prompt = `You are a senior medical consultant. Write a highly DETAILED, comprehensive, academic-grade discharge summary for this patient.
 
 CONFIRMED DIAGNOSIS: ${confirmedDiagnosis}
@@ -1482,37 +1474,7 @@ CHECKLIST ANSWERS:
 ${filledAnswersText}
 
 INSTRUCTIONS:
-1. Provide a comprehensive, in-depth discharge summary. Elaborate fully on history (HPI), general/systemic examinations, complete investigations trends, detailed hospital course (treatments, boluses, transfusions), and structured discharge warnings/screenings.
-2. Use professional medical terminology and ensure a cohesive, professional narrative.
-3. The DIAGNOSIS section MUST use exactly TWO separate headings in this order:
-
-   DIAGNOSIS
-   [Clinical description of the condition, e.g.: Acute Infective Hepatitis with signs of liver cell failure, ascitis]
-
-   PRIMARY DIAGNOSIS
-   ICD-10 Code: B15.9 (Hepatitis A without hepatic coma)
-   ICD-10 Code: K72.0 (Acute and subacute hepatic failure)
-   ICD-10 Code: R17 (Unspecified jaundice)
-   ICD-10 Code: R60.0 (Localized edema)
-
-   ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
-3a. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
-3b. For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
-4. If there are any patient reports, laboratory investigations, or clinical tests, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |) instead of default Markdown. The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
-5. Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only.
-5. Use clean, standard uppercase section headers:
-   DIAGNOSIS
-   CHIEF COMPLAINT
-   HISTORY OF PRESENT ILLNESS
-   GENERAL EXAMINATION
-   VITALS
-   SYSTEMIC EXAMINATION
-   INVESTIGATIONS
-   TREATMENT GIVEN
-   COURSE OF TREATMENT IN HOSPITAL
-   TREATMENT ADVICE AT DISCHARGE
-   NEXT REVIEW
-6. Output ONLY the plain text summary. No introduction, markdown code fences, or comments.`;
+${detailedInstructions}`;
     }
 
     try {
@@ -1999,7 +1961,7 @@ ${patient ? `PATIENT: ${patient}\n` : ""}${reportsText ? `REPORTS (use these EXA
    ALL ICD-10 codes (primary and secondary) are listed together under PRIMARY DIAGNOSIS only. Do NOT create a separate SECONDARY DIAGNOSIS heading.
 - Do NOT use any markdown bold syntax (**text**) anywhere in the summary. All labels and headings must be in PLAIN CAPITAL LETTERS only (e.g., HEART RATE, PRIMARY DIAGNOSIS).
 - For vitals, use colon-dash style: Heart Rate:- 88/min, Respiratory Rate:- 20/min, Temperature:- 98.6°F (no asterisks, no bold).
-- If there are any laboratory investigations or clinical tests, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |). The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
+- If there are any laboratory investigations or clinical tests, CRITICAL RULE: the INVESTIGATIONS section must ONLY contain tests that were actually performed AND have an available result/value. NEVER list a test that is merely "Advised", ordered, planned, pending, awaited, or has no result — omit those entirely. If no investigation has an actual result, omit the INVESTIGATIONS section completely. For the tests that DO have results, you MUST format them under the heading "INVESTIGATIONS" as a clean, aligned plain-text ASCII grid trend table (using characters like +, -, and |). The columns MUST represent absolute calendar dates formatted in DD-MM-YYYY format (e.g. | Test Name | 07-07-2026 | 08-07-2026 | ... |) sorted in chronological increasing order. You MUST NOT use relative day descriptors like "Day 2 of Life" or "Day 3". The rows must represent individual test parameters. Do NOT include reference ranges or units as separate columns. Pad columns with spaces so vertical borders align perfectly. Compatible with word processors.
 - Use EXACTLY these section headers in order: ${SECTION_SEQUENCE.join(", ")}
 
 Plain text only, no markdown.`;
