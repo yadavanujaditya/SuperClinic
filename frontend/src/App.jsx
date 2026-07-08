@@ -4,6 +4,17 @@ import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, bui
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 
+// ─── Responsive helper ────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 480) {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= breakpoint);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0F6E56", light: "#1D9E75", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
 const AMBER = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
@@ -1032,6 +1043,7 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
   const [readerState, setReaderState] = useState(null); // { doc, initPage }
   const [creatingFromPdf, setCreatingFromPdf] = useState(false);
   const [tagLibraryOpen, setTagLibraryOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const addTagSource = (label, docName, page, extractedText, image) => {
     const norm = label.trim().toLowerCase();
@@ -1107,7 +1119,7 @@ Return ONLY valid JSON with this exact structure:
 
   return (
     <div data-testid="library-screen" style={{ minHeight: "100vh" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🩺</span>
           <div>
@@ -1115,7 +1127,7 @@ Return ONLY valid JSON with this exact structure:
             <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>India Government Hospital OPD</p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <ProductToggle product={product} setProduct={setProduct} />
           <ProfileMenu
             onSettings={() => setSettingsOpen(true)}
@@ -1287,6 +1299,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
   const [indexProgress, setIndexProgress] = useState(null); // { done, total } while extracting
   const canvasRef = useRef();
   const pageCache = useRef(new Map()); // page number -> extracted text, built lazily & reused across searches
+  const isMobile = useIsMobile();
 
   // Extract & cache every page's text once, so repeat searches are instant.
   const ensureIndexed = async () => {
@@ -1427,7 +1440,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
   return (
     <div style={{ position: "fixed", inset: 0, background: "#0D1117", zIndex: 500, display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ background: "#161B22", borderBottom: "1px solid #21262D", padding: "10px 16px", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+      <div style={{ background: "#161B22", borderBottom: "1px solid #21262D", padding: "10px 16px", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap", rowGap: 8 }}>
         <button data-testid="pdf-reader-close-btn" onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "#8B949E", flexShrink: 0 }}>✕</button>
         <p style={{ fontSize: 13, fontWeight: 600, color: "#E6EDF3", margin: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>📖 {docName}</p>
 
@@ -1471,9 +1484,9 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", overflow: isMobile ? "auto" : "hidden" }}>
         {/* Left: Chapters / Search */}
-        <div style={{ width: 240, background: "#0D1117", borderRight: "1px solid #21262D", padding: "14px 12px", overflowY: "auto", flexShrink: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ width: isMobile ? "100%" : 240, background: "#0D1117", borderRight: isMobile ? "none" : "1px solid #21262D", borderBottom: isMobile ? "1px solid #21262D" : "none", padding: "14px 12px", overflowY: "auto", flexShrink: 0, display: "flex", flexDirection: "column", maxHeight: isMobile ? 220 : "none" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 12, flexShrink: 0 }}>
             {[["chapters", "Chapters"], ["search", "🔍 Search"]].map(([id, label]) => (
               <button key={id} data-testid={`pdf-reader-lefttab-${id}-btn`} onClick={() => setLeftTab(id)}
@@ -1543,7 +1556,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Canvas */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: "28px 24px", background: "#0D1117", position: "relative" }}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: isMobile ? "16px 8px" : "28px 24px", background: "#0D1117", position: "relative" }}>
           {loadError ? (
             <div style={{ color: "#F87171", fontSize: 14, marginTop: 60, textAlign: "center", maxWidth: 400 }}>
               <p style={{ fontSize: 24, margin: "0 0 12px" }}>⚠️</p>
@@ -1570,7 +1583,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Right panel */}
-        <div style={{ width: 240, background: "#161B22", borderLeft: "1px solid #21262D", padding: "16px 14px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0 }}>
+        <div style={{ width: isMobile ? "100%" : 240, background: "#161B22", borderLeft: isMobile ? "none" : "1px solid #21262D", borderTop: isMobile ? "1px solid #21262D" : "none", padding: "16px 14px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0, maxHeight: isMobile ? 320 : "none" }}>
 
           {/* Tag form */}
           {showTagPanel && (
@@ -2139,6 +2152,8 @@ Rules:
     rec.start(); recRef.current = rec; setVoiceOn(true);
   };
 
+  const isMobile = useIsMobile();
+
   return (
     <div data-testid="consultation-screen" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-background-primary)" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "12px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
@@ -2161,7 +2176,7 @@ Rules:
         </div>
       )}
 
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 300px", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px", overflow: "auto" }}>
         <div style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
           {history.length > 0 && (
             <div ref={histRef} style={{ maxHeight: 150, overflowY: "auto", background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 14px" }}>
@@ -2276,7 +2291,7 @@ Rules:
           )}
         </div>
 
-        <div style={{ borderLeft: "1px solid var(--color-border-primary)", padding: 16, overflowY: "auto", background: "#fff" }}>
+        <div style={{ borderLeft: isMobile ? "none" : "1px solid var(--color-border-primary)", borderTop: isMobile ? "1px solid var(--color-border-primary)" : "none", padding: 16, overflowY: "auto", background: "#fff" }}>
           <DifferentialsPanel differentials={differentials} onClickDiag={openSidebar} />
         </div>
       </div>
@@ -2402,7 +2417,7 @@ export default function App() {
       />
       {product === "supersummary" && (
         <div style={{ minHeight: "100vh" }}>
-          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 22 }}>📋</span>
               <div>

@@ -1,0 +1,30 @@
+{
+  "summary": "Focused regression pass re-verifying the 3 mobile-responsive (375x812) fixes from iteration_2.json plus a desktop (1920px) sanity check. FIX1 (header wrap on Library screen) and FIX2 (Consultation question/options full-width stacking) are both FULLY FIXED and confirmed via DOM assertions (scrollWidth<=clientWidth+5) and screenshots -- header now wraps cleanly (logo/title on top row, ClinicalMind/SuperSummary toggle + avatar on second row), and consultation options render at full width (335px of 375px viewport) with differentials panel stacked below, fully readable. FIX3 (PDFReader 3-pane layout) is PARTIALLY fixed: visually the layout correctly stacks vertically (Chapters/Search panel on top, canvas below, tags panel below, toolbar buttons wrap and are all clickable/reachable) -- this matches the requested fix. However, document.documentElement.scrollWidth still exceeds clientWidth by ~65px on the PDFReader screen due to a SEPARATE, likely pre-existing issue: a hidden Settings drawer (data-testid='settings-provider-claude-btn' etc.) that sits off-canvas via `position:fixed; transform:translateX(380px)` contributes to page scrollWidth. This same drawer causes a negligible 3px overflow on the Library screen (within tolerance) but a larger 65px overflow once the PDFReader is open. Desktop sanity check (1920px) passed: Library screen, 2-column Consultation grid (options left ~1580px wide, differentials panel ~220px right column), and general layout all unchanged from before -- mobile-only isMobile<=480 logic confirmed not to affect desktop rendering.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PDFReader mobile (375px)", "issue": "3-pane layout now correctly stacks vertically (visually confirmed fixed) BUT document.documentElement.scrollWidth (440px) still exceeds clientWidth (375px) by 65px, caused by an off-canvas Settings drawer (position:fixed + transform:translateX(380px)) that is always mounted in the DOM regardless of screen. This transform-based hidden drawer inflates scrollWidth in some browsers even though it's visually off-screen. Same drawer causes a minor 3px overflow even on the Library screen (tolerable) but becomes 65px on the PDFReader screen.", "selector": "[data-testid='settings-provider-claude-btn'] and its fixed-position ancestor div", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX1 and FIX2 fully verified working -- no further action needed.",
+    "FIX3 visual stacking is correct, but consider setting `display:none` (instead of relying only on transform/position:fixed) for the closed/hidden Settings drawer, or add `overflow-x:hidden` on a top-level wrapper, to eliminate the residual ~65px scrollWidth overflow on the PDFReader mobile view. This is LOW priority/cosmetic since it doesn't visually break anything or block interaction, but technically fails the strict scrollWidth<=clientWidth+5 check requested in the review."
+  ],
+  "critical_code_review_comments": [
+    "The hidden Settings drawer being always-mounted with only a CSS transform to hide it (rather than display:none or a portal that's unmounted) is a minor anti-pattern that causes subtle scrollWidth overflow bugs like this one -- worth a small follow-up if pixel-perfect mobile scrolling is required."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A - no backend for this app by design", "frontend": "2.5/3 fixes fully verified (FIX1, FIX2 100% fixed; FIX3 visually fixed but minor residual overflow from unrelated drawer); desktop sanity 100% passed"},
+  "test_credentials": "None required.",
+  "seed_data_creation": "Generated a 2-page test PDF (/tmp/mobile_test.pdf via reportlab) and uploaded it to Document Vault during mobile PDFReader testing. Browser-session localStorage only, not persistent.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "FIX1 (header wrap) and FIX2 (consultation full-width options) are fully resolved -- do not retest. FIX3 (PDFReader 3-pane -> vertical stack on mobile) is visually correct but there's a residual ~65px horizontal scroll overflow caused by an unrelated off-canvas Settings drawer using transform instead of display:none; this is a low-priority cosmetic issue, not a re-introduction of the original 3-column grid bug. If main agent fixes the drawer's hide mechanism, a quick re-check of document.documentElement.scrollWidth on the PDFReader mobile view would confirm full resolution.",
+  "rca of the issue": "The Settings side-drawer component is always rendered in the DOM (not conditionally unmounted) and uses `position:fixed` combined with `transform: translateX(380px)` to visually hide it off-screen when closed. While position:fixed elements normally don't affect document scroll dimensions, when combined with a CSS transform some browsers still factor the element's post-transform bounding box into the document's scrollWidth calculation, causing horizontal overflow that isn't visually apparent but is detectable via DOM assertions. Recommended fix: use `display:none` (or conditionally render only when open) instead of relying solely on transform positioning for the closed state."
+}
