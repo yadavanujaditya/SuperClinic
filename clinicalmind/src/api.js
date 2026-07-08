@@ -19,7 +19,7 @@ async function streamClaude(messages, system, apiKey, model, onDelta) {
       "anthropic-dangerous-direct-browser-access": "true",
       "x-api-key": apiKey,
     },
-    body: JSON.stringify({ model, max_tokens: 1024, stream: true, system, messages }),
+    body: JSON.stringify({ model, max_tokens: 4096, stream: true, system, messages }),
   });
   if (!res.ok) throw new Error(`Claude API ${res.status}: ${await res.text()}`);
   const reader = res.body.getReader();
@@ -55,7 +55,7 @@ async function streamGemini(messages, system, apiKey, model, onDelta) {
   const body = {
     contents,
     systemInstruction: system ? { parts: [{ text: system }] } : undefined,
-    generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget } },
+    generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget } },
   };
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) throw new Error(`Gemini API ${res.status}: ${await res.text()}`);
@@ -88,7 +88,7 @@ async function streamOpenAICompat(messages, system, apiKey, model, onDelta, base
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model, max_tokens: 1024, stream: true,
+      model, max_tokens: 4096, stream: true,
       messages: [
         ...(system ? [{ role: "system", content: system }] : []),
         ...messages,
