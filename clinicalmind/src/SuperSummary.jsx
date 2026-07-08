@@ -394,7 +394,7 @@ Rules:
           Paste one of your <strong>real discharge summaries</strong> below. Then <strong>select any words that change per patient</strong> (a value, the age, a duration) and click <strong>“+ Make blank”</strong>. Everything you don't mark stays fixed and prints exactly as written.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+        <div className="template-editor-grid" style={{ gap: 12, marginBottom: 14 }}>
           <input style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Template name (e.g. Neonatal Jaundice)" />
           <input style={inputS} value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" />
         </div>
@@ -417,9 +417,10 @@ Rules:
         {aiFindError && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>{aiFindError}</p>}
 
         <textarea ref={bodyRef} value={form.sampleBody} onSelect={captureSelection}
+          className="premium-textarea"
           onChange={e => setForm(f => ({ ...f, sampleBody: e.target.value.replace(/\r\n/g, "\n") }))}
           placeholder="Paste your discharge summary here…"
-          style={{ ...inputS, minHeight: 300, fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7, resize: "vertical" }} />
+          style={{ minHeight: 300, resize: "vertical" }} />
 
         {slotDraft && (
           <div style={{ background: PURPLE.bg, border: `1px solid ${PURPLE.border}`, borderRadius: 10, padding: 14, marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -430,7 +431,7 @@ Rules:
                 ✕
               </button>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="template-preview-grid" style={{ gap: 10 }}>
               <input style={inputS} autoFocus value={slotDraft.label} onChange={e => setSlotDraft(s => ({ ...s, label: e.target.value }))} placeholder="Label, e.g. TSB at admission" />
               <input style={inputS} value={slotDraft.ocrHints} onChange={e => setSlotDraft(s => ({ ...s, ocrHints: e.target.value }))} placeholder="OCR hints (optional): tsb, bilirubin" />
             </div>
@@ -481,7 +482,7 @@ Rules:
 
 // ─── Template Library ───────────────────────────────────────────────────────────
 function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartAiMode, hasKey }) {
-  const [tab, setTab] = useState("Public");
+  const [tab, setTab] = useState("AI");
   const [aiComplaint, setAiComplaint] = useState("");
   const source = tab === "Public" ? SYSTEM_TEMPLATES : tab === "AI" ? [] : customTemplates.filter(t => t.source === (tab === "My Templates" ? "private" : "community"));
   return (
@@ -1909,6 +1910,18 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             <Btn variant="secondary" small onClick={() => { navigator.clipboard?.writeText(summaryText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} disabled={generatingSummary}>
               {copied ? "✓ Copied!" : "Copy Summary"}
             </Btn>
+            <Btn variant="secondary" small onClick={() => {
+              const filename = `${confirmedDiagnosis.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_discharge_summary.txt`;
+              const element = document.createElement("a");
+              const file = new Blob([summaryText], { type: "text/plain;charset=utf-8" });
+              element.href = URL.createObjectURL(file);
+              element.download = filename;
+              document.body.appendChild(element);
+              element.click();
+              document.body.removeChild(element);
+            }} disabled={generatingSummary}>
+              📥 Download TXT
+            </Btn>
             <Btn onClick={() => setWizardSaveModal(true)} disabled={generatingSummary || !summaryText.trim()}>
               💾 Save as Template
             </Btn>
@@ -2013,6 +2026,16 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="secondary" small onClick={handleCopy} disabled={loading}>{copied ? "✓ Copied!" : "Copy"}</Btn>
+          <Btn variant="secondary" small onClick={() => {
+            const filename = `${complaint.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_draft.txt`;
+            const element = document.createElement("a");
+            const file = new Blob([text], { type: "text/plain;charset=utf-8" });
+            element.href = URL.createObjectURL(file);
+            element.download = filename;
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+          }} disabled={loading}>📥 Download TXT</Btn>
           <Btn small onClick={onDone} disabled={loading}>Finish</Btn>
           <Btn variant="ghost" small onClick={onCancel}>Cancel</Btn>
         </div>
@@ -2034,7 +2057,7 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
       <Card style={{ padding: 20 }}>
         {loading ? <p style={{ fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center", padding: 40 }}>✨ Drafting…</p>
           : error ? <div><p style={{ fontSize: 14, color: AMBER.text, margin: "0 0 12px" }}>{error}</p><Btn small onClick={generate}>Retry</Btn></div>
-          : editing ? <textarea value={text} onChange={e => setText(e.target.value)} style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
+          : editing ? <textarea className="premium-textarea" value={text} onChange={e => setText(e.target.value)} style={{ minHeight: 440, resize: "vertical" }} />
           : <pre style={{ fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap", margin: 0 }}>{text}</pre>}
       </Card>
       {!loading && !error && <Btn variant="secondary" small onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "✏️ Edit"}</Btn>}
