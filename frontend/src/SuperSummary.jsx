@@ -3,6 +3,10 @@ import { SYSTEM_TEMPLATES, emptyTemplate, parseTemplateParts, fillTemplate, SECT
 import { extractDocumentText } from "./ocr.js";
 import { callAIStream, parseJSON, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { CardCarousel, IllustDocs, IllustScan, IllustSafety } from "./HomeHero.jsx";
+import { saveSummaryRecord } from "./records.js";
+import { RatingPrompt } from "./RatingPrompt.jsx";
+import { publishTemplate as apiPublishTemplate, listCommunityTemplates, rateTemplate } from "./community.js";
+import { CommunityBrowserModal } from "./CommunityBrowserModal.jsx";
 
 const TEAL   = { primary: "#0F6E56", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
 const AMBER  = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
@@ -516,67 +520,97 @@ function HowToUseCarousel() {
 }
 
 // ─── Template Library ───────────────────────────────────────────────────────────
-function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartAiMode, hasKey }) {
-  const [tab, setTab] = useState("AI");
-  const [aiComplaint, setAiComplaint] = useState("");
-  const source = tab === "Public" ? SYSTEM_TEMPLATES : tab === "AI" ? [] : customTemplates.filter(t => t.source === (tab === "My Templates" ? "private" : "community"));
+function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onPublish, onBrowseCommunity }) {
+  const [tab, setTab] = useState("System Template");
+  const source = tab === "System Template" ? SYSTEM_TEMPLATES : customTemplates.filter(t => t.source === "private");
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <HowToUseCarousel />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Template Library</h3>
-        {tab !== "AI" && <Btn testId="new-template-btn" small onClick={() => onEdit(null)}>+ New Template</Btn>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button data-testid="browse-community-templates-btn" onClick={onBrowseCommunity}
+            style={{ fontSize: 12.5, fontWeight: 700, color: PURPLE.primary, background: PURPLE.bg, border: `1px solid ${PURPLE.border}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+            🌐 Community
+          </button>
+          <Btn testId="new-template-btn" small onClick={() => onEdit(null)}>+ New Template</Btn>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {["Public", "My Templates", "Community", "AI"].map(t => (
+        {["System Template", "My Templates"].map(t => (
           <button key={t} data-testid={`template-tab-${t.replace(/\s+/g, "-").toLowerCase()}`} onClick={() => setTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-            borderColor: tab === t ? (t === "AI" ? "#A855F7" : PURPLE.primary) : "var(--color-border-primary)",
-            background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : PURPLE.bg) : "#fff",
-            boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
-            color: tab === t ? (t === "AI" ? "#F3E8FF" : PURPLE.primary) : "var(--color-text-secondary)" }}>{t === "AI" ? "✨ AI Mode" : t}</button>
+            borderColor: tab === t ? PURPLE.primary : "var(--color-border-primary)",
+            background: tab === t ? PURPLE.bg : "#fff",
+            color: tab === t ? PURPLE.primary : "var(--color-text-secondary)" }}>{t}</button>
         ))}
       </div>
-      {tab === "AI" ? (
-        <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: "#F3E8FF", margin: 0 }}>✨ No template? Let AI draft one.</p>
-          <p style={{ fontSize: 12, color: "#D8B4FE", margin: 0 }}>Type the diagnosis — AI drafts a typical summary instantly; refine with photos or notes.</p>
-          <input value={aiComplaint} onChange={e => setAiComplaint(e.target.value)} placeholder="e.g. Nephrotic syndrome relapse"
-            style={{ padding: "9px 12px", border: "1.5px solid #A855F7", borderRadius: 8, fontSize: 14, outline: "none", background: "rgba(255,255,255,0.08)", color: "#F3E8FF", boxSizing: "border-box" }} />
-          {!hasKey && <p style={{ fontSize: 11, color: "#c4b5fd", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>}
-          <Btn disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())} style={{ background: hasKey ? "#8B5CF6" : "#4c1d5580", color: "#fff", alignSelf: "flex-start" }}>
-            {!hasKey ? "⚠ Add API Key First" : "✨ Draft it →"}
-          </Btn>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10, maxHeight: 400, overflowY: "auto" }}>
-          {source.map(t => (
-            <div key={t.id} data-testid={`template-card-${t.id}`} onClick={() => onSelect(t)} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 10, padding: 14, cursor: "pointer" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 6px" }}>{t.name}</p>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button onClick={e => { e.stopPropagation(); onEdit(t); }} title={t.source === "system" ? "Edit a copy in My Templates" : "Edit"}
-                    data-testid={`template-edit-${t.id}`}
-                    style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>✏️</button>
-                  {t.source !== "system" && (
-                    <button onClick={e => {
-                      e.stopPropagation();
-                      if (window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) {
-                        onDelete(t.id);
-                      }
-                    }} title="Delete" data-testid={`template-delete-${t.id}`} style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>🗑️</button>
-                  )}
-                </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10, maxHeight: 400, overflowY: "auto" }}>
+        {source.map(t => (
+          <div key={t.id} data-testid={`template-card-${t.id}`} onClick={() => onSelect(t)} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 10, padding: 14, cursor: "pointer" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 6px" }}>{t.name}</p>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {tab === "My Templates" && (
+                  <button onClick={e => { e.stopPropagation(); onPublish(t); }} title="Publish to Community"
+                    data-testid={`template-publish-${t.id}`}
+                    style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>🌐</button>
+                )}
+                <button onClick={e => { e.stopPropagation(); onEdit(t); }} title={t.source === "system" ? "Edit a copy in My Templates" : "Edit"}
+                  data-testid={`template-edit-${t.id}`}
+                  style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>✏️</button>
+                {t.source !== "system" && (
+                  <button onClick={e => {
+                    e.stopPropagation();
+                    if (window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) {
+                      onDelete(t.id);
+                    }
+                  }} title="Delete" data-testid={`template-delete-${t.id}`} style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>🗑️</button>
+                )}
               </div>
-              <span style={{ fontSize: 11, color: PURPLE.text, background: PURPLE.bg, padding: "2px 6px", borderRadius: 4 }}>{t.category}</span>
-              <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "8px 0 0" }}>{(t.slots || []).length} blanks to fill</p>
             </div>
-          ))}
-          {!source.length && <p style={{ gridColumn: "1/-1", textAlign: "center", color: "var(--color-text-secondary)", fontSize: 13, padding: 20 }}>No templates here yet.</p>}
-        </div>
-      )}
+            <span style={{ fontSize: 11, color: PURPLE.text, background: PURPLE.bg, padding: "2px 6px", borderRadius: 4 }}>{t.category}</span>
+            <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "8px 0 0" }}>{(t.slots || []).length} blanks to fill</p>
+          </div>
+        ))}
+        {!source.length && <p style={{ gridColumn: "1/-1", textAlign: "center", color: "var(--color-text-secondary)", fontSize: 13, padding: 20 }}>No templates here yet.</p>}
+      </div>
     </div>
   );
 }
+
+// ─── AI Mode Card — standalone top-level card (image + freeform diagnosis-to-draft) ─────
+function AiModeCard({ hasKey, onStartAiMode, setSettingsOpen }) {
+  const [aiComplaint, setAiComplaint] = useState("");
+  return (
+    <Card testId="ai-mode-card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", border: "1px solid rgba(168,85,247,0.25)" }} className="premium-card">
+      <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderBottom: "1px solid rgba(124,58,237,0.15)" }}>
+        <CardCarousel accent="#a855f7" slides={[IllustScan, IllustSafety]} />
+      </div>
+      <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 20 }}>✨</span>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: "#7c3aed", margin: 0 }}>AI Mode</h3>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 16px 0" }}>
+          No template? Type the diagnosis — AI drafts a typical summary instantly; refine with photos or notes.
+        </p>
+        <input data-testid="ai-mode-complaint-input" value={aiComplaint} onChange={e => setAiComplaint(e.target.value)} placeholder="e.g. Nephrotic syndrome relapse"
+          style={{ padding: "9px 12px", border: "1.5px solid #D8C7FF", borderRadius: 8, fontSize: 14, outline: "none", marginBottom: 12, boxSizing: "border-box" }} />
+        {!hasKey && (
+          <p style={{ fontSize: 12, color: PURPLE.text, margin: "0 0 12px" }}>
+            ⚠ AI isn't configured yet.{" "}
+            <button onClick={() => setSettingsOpen(true)} data-testid="ai-mode-add-apikey-btn" style={{ background: "none", border: "none", color: PURPLE.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 12, padding: 0 }}>Settings →</button>
+          </p>
+        )}
+        <button data-testid="launch-ai-mode-btn" disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())}
+          style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: hasKey ? "#7c3aed" : "#c4b5fd", color: "#fff", border: "none", cursor: hasKey ? "pointer" : "not-allowed", boxShadow: hasKey ? "0 4px 10px rgba(124, 58, 237, 0.2)" : "none" }}>
+          {!hasKey ? "⚠ AI Not Available" : "Launch AI Mode →"}
+        </button>
+      </div>
+    </Card>
+  );
+}
+
 
 // ─── Fill Screen — the living document with editable blanks + multi-image autofill ─
 function FillScreen({ template: rawTemplate, provider, apiKey, onCancel, onSaveAsTemplate, existingTemplates = [], aiAssistantEnabled = true }) {
@@ -594,6 +628,7 @@ function FillScreen({ template: rawTemplate, provider, apiKey, onCancel, onSaveA
   const [savedToast, setSavedToast] = useState(false);
   const [customInfo, setCustomInfo] = useState("");
   const [voiceOn, setVoiceOn] = useState(false);
+  const [savedSummaryId, setSavedSummaryId] = useState(null);
   const recRef = useRef(null);
   const consumed = useRef(new Set());
 
@@ -843,7 +878,11 @@ INSTRUCTIONS:
           <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>The summary is already written — just fill the highlighted blanks (or upload photos to auto-fill)</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Btn testId="fillscreen-copy-btn" variant="secondary" small onClick={() => navigator.clipboard?.writeText(finalText())}>Copy</Btn>
+          <Btn testId="fillscreen-copy-btn" variant="secondary" small onClick={async () => {
+            navigator.clipboard?.writeText(finalText());
+            const saved = await saveSummaryRecord({ diagnosis: template.diagnosis || template.name, template_name: template.name, source: "fill", text: finalText() });
+            if (saved?.id) setSavedSummaryId(saved.id);
+          }}>Copy</Btn>
           <Btn testId="fillscreen-close-btn" variant="ghost" small onClick={onCancel}>Close</Btn>
         </div>
       </div>
@@ -1145,6 +1184,7 @@ INSTRUCTIONS:
       </Card>
 
       <SafetyCheckPanel getText={finalText} diagnosis={template.diagnosis} provider={provider} apiKey={apiKey} />
+      {savedSummaryId && <RatingPrompt recordType="summary" recordId={savedSummaryId} onDismiss={() => setSavedSummaryId(null)} />}
     </div>
   );
 }
@@ -1189,6 +1229,7 @@ function SuperFastAiWizard({ template, provider, apiKey, onCancel, onSaveAsTempl
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [refinePrompt, setRefinePrompt] = useState("");
+  const [savedSummaryId, setSavedSummaryId] = useState(null);
 
   // Auto-compile clinical docs when all uploads finish
   const prevDoneDocs = useRef(0);
@@ -1542,6 +1583,10 @@ ${detailedInstructions}`;
           setSummaryText(t);
         }
       );
+      if (raw.trim()) {
+        const saved = await saveSummaryRecord({ diagnosis: confirmedDiagnosis || template.diagnosis || template.name, template_name: template.name, source: "ai_wizard", text: raw });
+        if (saved?.id) setSavedSummaryId(saved.id);
+      }
     } catch (err) {
       alert("Failed to generate summary: " + err.message);
       setSummaryText("");
@@ -2011,6 +2056,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
           )}
         </div>
       )}
+      {savedSummaryId && <RatingPrompt recordType="summary" recordId={savedSummaryId} onDismiss={() => setSavedSummaryId(null)} />}
     </div>
   );
 }
@@ -2054,12 +2100,21 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
   const [exceptions, setExceptions] = useState("");
   const [voiceOn, setVoiceOn] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [savedSummaryId, setSavedSummaryId] = useState(null);
   const recRef = useRef(null);
   const reportsText = () => docs.filter(d => d.status === "done").map(d => d.ocrText).join("\n\n").slice(0, 3000);
 
   const generate = async () => {
     setLoading(true); setError("");
-    try { const d = await composeTypicalDraft(complaint, { patient, reportsText: reportsText(), exceptions }, provider, apiKey); setText(d || ""); if (!d) setError("Could not generate — tap to retry."); }
+    try {
+      const d = await composeTypicalDraft(complaint, { patient, reportsText: reportsText(), exceptions }, provider, apiKey);
+      setText(d || "");
+      if (!d) setError("Could not generate — tap to retry.");
+      else {
+        const saved = await saveSummaryRecord({ diagnosis: complaint, template_name: null, source: "ai_mode", text: d });
+        if (saved?.id) setSavedSummaryId(saved.id);
+      }
+    }
     catch (e) { setError(`${e.message}. Tap to retry.`); } finally { setLoading(false); }
   };
   useEffect(() => { generate(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -2124,6 +2179,7 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
       </Card>
       {!loading && !error && <Btn testId="aimode-edit-toggle-btn" variant="secondary" small onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "✏️ Edit"}</Btn>}
       {!loading && !error && <SafetyCheckPanel getText={() => text} diagnosis={complaint} provider={provider} apiKey={apiKey} />}
+      {savedSummaryId && <RatingPrompt recordType="summary" recordId={savedSummaryId} onDismiss={() => setSavedSummaryId(null)} />}
     </div>
   );
 }
@@ -2165,6 +2221,27 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
     setEditing(undefined);
   };
 
+  const [communityTemplatesOpen, setCommunityTemplatesOpen] = useState(false);
+
+  const publishTemplateHandler = async (t) => {
+    try {
+      await apiPublishTemplate({ name: t.name, diagnosis: t.diagnosis, category: t.category, slots: t.slots, sampleBody: t.sampleBody });
+      alert(`"${t.name}" published to the community! Other users can now find and rate it.`);
+    } catch (err) {
+      alert("Could not publish: " + err.message);
+    }
+  };
+
+  const importTemplateHandler = (item) => {
+    const rec = { id: (item.name || "template").toLowerCase().replace(/\s+/g, "_") + "_" + Date.now(), name: item.name + " (community)", diagnosis: item.diagnosis, category: item.category, slots: item.slots, sampleBody: item.sampleBody, source: "private", createdAt: new Date().toISOString() };
+    const prev = JSON.parse(localStorage.getItem("clinicalmind:templates") || "[]");
+    const next = [...prev, rec];
+    localStorage.setItem("clinicalmind:templates", JSON.stringify(next));
+    setCustomTemplates(next);
+    setCommunityTemplatesOpen(false);
+    alert(`"${item.name}" imported into My Templates!`);
+  };
+
   return (
     <div style={{ minHeight: "100vh" }}>
       {phase === "library" && (
@@ -2173,21 +2250,26 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
             <div style={{ background: AMBER.bg, border: `1px solid ${AMBER.border}`, borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 20 }}>📴</span>
               <p style={{ fontSize: 14, color: AMBER.text, margin: 0 }}>
-                <strong>No API key.</strong> Templates fill instantly by hand; photo auto-fill, AI Mode & Safety Check need a key.{" "}
-                <button onClick={() => setSettingsOpen(true)} data-testid="supersummary-add-apikey-btn" style={{ background: "none", border: "none", color: PURPLE.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
+                <strong>AI not configured.</strong> Templates fill instantly by hand; photo auto-fill, AI Mode & Safety Check need your admin to add an API key.{" "}
+                <button onClick={() => setSettingsOpen(true)} data-testid="supersummary-add-apikey-btn" style={{ background: "none", border: "none", color: PURPLE.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Open Settings →</button>
               </p>
             </div>
           )}
-          <Card>
-            <TemplateLibrary customTemplates={customTemplates} onEdit={openEdit} onDelete={deleteTemplate} hasKey={!!apiKey}
-              onSelect={t => { setSelectedTemplateForOptions(t); }}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 16 }}>
+            <AiModeCard hasKey={!!apiKey} setSettingsOpen={setSettingsOpen}
               onStartAiMode={c => {
                 const dummyTemplate = { id: "ai_mode", name: c, diagnosis: c, slots: [], sampleBody: "", category: "General", source: "private" };
                 setActiveTemplate(dummyTemplate);
                 setAiAssistantEnabled(true);
                 setPhase("ai_wizard");
               }} />
-          </Card>
+            <Card testId="template-library-card">
+              <TemplateLibrary customTemplates={customTemplates} onEdit={openEdit} onDelete={deleteTemplate}
+                onSelect={t => { setSelectedTemplateForOptions(t); }}
+                onPublish={publishTemplateHandler}
+                onBrowseCommunity={() => setCommunityTemplatesOpen(true)} />
+            </Card>
+          </div>
         </div>
       )}
 
@@ -2280,6 +2362,10 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
 
       {editing !== undefined && (
         <TemplateEditor template={editing} onSave={saveTemplate} onDelete={deleteTemplate} onClose={() => setEditing(undefined)} provider={provider} apiKey={apiKey} />
+      )}
+      {communityTemplatesOpen && (
+        <CommunityBrowserModal title="Community Templates" listFn={listCommunityTemplates} rateFn={rateTemplate}
+          onImport={importTemplateHandler} onClose={() => setCommunityTemplatesOpen(false)} />
       )}
     </div>
   );

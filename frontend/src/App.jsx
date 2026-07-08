@@ -5,6 +5,11 @@ import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
 import { useAuth } from "./AuthContext.jsx";
+import { saveCaseRecord } from "./records.js";
+import { RecordsModal } from "./RecordsModal.jsx";
+import { AdminDashboard } from "./AdminDashboard.jsx";
+import { RatingPrompt } from "./RatingPrompt.jsx";
+import { publishWorkflow, listCommunityWorkflows, rateWorkflow } from "./community.js";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -21,10 +26,6 @@ const LIKELIHOOD_COLORS = {
 };
 
 const CATEGORIES = ["All","Respiratory","GI","Neuro","Skin","Urinary","Hematology","MSK","Eye-ENT","Newborn","General","Behavioral","Emergency"];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function apiKeyFor(provider) { return localStorage.getItem(`clinicalmind:apikey:${provider}`) || ""; }
-function saveApiKey(provider, key) { localStorage.setItem(`clinicalmind:apikey:${provider}`, key); }
 
 // ─── Shared components ────────────────────────────────────────────────────────
 function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {}, testId, ...rest }) {
@@ -162,28 +163,59 @@ async function getPDFChapters(pdfDoc) {
 
 // ─── Settings Panel ───────────────────────────────────────────────────────────
 function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCurrentKey }) {
-  const p = getProvider(provider);
-  const [draft, setDraft] = useState(currentKey);
-  const [saved, setSaved] = useState(false);
-  const [showKey, setShowKey] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const API_URL = import.meta.env.REACT_APP_BACKEND_URL;
 
   const [genericInst, setGenericInst] = useState("");
   const [detailedInst, setDetailedInst] = useState("");
+  const [saved, setSaved] = useState(false);
 
-  // Sync draft and instructions when panel opens or settings change
+  // Admin AI-config state
+  const [aiConfig, setAiConfig] = useState({ configured: false, provider: null, masked_key: null });
+  const [aiProviderDraft, setAiProviderDraft] = useState("claude");
+  const [aiKeyDraft, setAiKeyDraft] = useState("");
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiSavedMsg, setAiSavedMsg] = useState(false);
+
   useEffect(() => {
-    setDraft(currentKey);
     setGenericInst(getGenericInstructions());
     setDetailedInst(getDetailedInstructions());
-  }, [provider, currentKey, open]);
+    if (open && isAdmin) {
+      fetch(`${API_URL}/api/admin/ai-config`, { credentials: "include" })
+        .then(r => r.json())
+        .then(data => { setAiConfig(data); setAiProviderDraft(data.provider || "claude"); })
+        .catch(() => {});
+    }
+  }, [open, isAdmin]);
 
-  const valid = draft.length > 4 && draft.startsWith(p.keyPrefix);
+  const saveAiConfig = async () => {
+    setAiError(""); setAiSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/ai-config`, {
+        method: "PUT", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: aiProviderDraft, api_key: aiKeyDraft }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Failed to save");
+      setAiConfig(data);
+      setAiKeyDraft("");
+      setAiSavedMsg(true);
+      setTimeout(() => setAiSavedMsg(false), 2000);
+      setCurrentKey(); // trigger sibling refresh of AI status for all users
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiSaving(false);
+    }
+  };
 
-  const save = () => {
-    saveApiKey(provider, draft);
-    setCurrentKey(draft);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const removeAiConfig = async () => {
+    if (!window.confirm("Remove the AI key? Users will lose access to AI features until a new key is added.")) return;
+    await fetch(`${API_URL}/api/admin/ai-config`, { method: "DELETE", credentials: "include" });
+    setAiConfig({ configured: false, provider: null, masked_key: null });
+    setCurrentKey();
   };
 
   const saveInstructions = () => {
@@ -208,46 +240,52 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <button data-testid="settings-close-btn" onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
 
-        {/* Provider selector */}
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>AI Provider</label>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {PROVIDERS.map(pr => (
-              <button key={pr.id} data-testid={`settings-provider-${pr.id}-btn`} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-sans)",
-                  border: `1.5px solid ${provider === pr.id ? TEAL.primary : "var(--color-border-primary)"}`,
-                  background: provider === pr.id ? TEAL.bg : "#fff", color: provider === pr.id ? TEAL.primary : "var(--color-text-primary)" }}>
-                <span>{pr.name}</span>
-                {apiKeyFor(pr.id) && <span style={{ fontSize: 11, background: TEAL.primary, color: "#fff", padding: "2px 7px", borderRadius: 10 }}>✓ Key saved</span>}
-              </button>
-            ))}
+        {/* AI key — admin manages centrally, regular users just see status */}
+        {isAdmin ? (
+          <div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>
+              AI Provider &amp; Key <span style={{ fontWeight: 400, color: PURPLE.primary }}>(Admin only)</span>
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+              {PROVIDERS.map(pr => (
+                <button key={pr.id} data-testid={`settings-provider-${pr.id}-btn`} onClick={() => setAiProviderDraft(pr.id)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-sans)",
+                    border: `1.5px solid ${aiProviderDraft === pr.id ? TEAL.primary : "var(--color-border-primary)"}`,
+                    background: aiProviderDraft === pr.id ? TEAL.bg : "#fff", color: aiProviderDraft === pr.id ? TEAL.primary : "var(--color-text-primary)" }}>
+                  <span>{pr.name}</span>
+                  {aiConfig.configured && aiConfig.provider === pr.id && <span style={{ fontSize: 11, background: TEAL.primary, color: "#fff", padding: "2px 7px", borderRadius: 10 }}>✓ Active</span>}
+                </button>
+              ))}
+            </div>
+            {aiConfig.configured && (
+              <p data-testid="settings-current-masked-key" style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "0 0 8px", fontFamily: "var(--font-mono)" }}>
+                Current key: {aiConfig.masked_key} (hidden — not shown in full for security)
+              </p>
+            )}
+            <input data-testid="settings-api-key-input" type="password" value={aiKeyDraft} onChange={e => setAiKeyDraft(e.target.value)}
+              placeholder={getProvider(aiProviderDraft).keyHint}
+              style={{ ...inputS, marginBottom: 8 }} />
+            {aiError && <p data-testid="settings-key-error-msg" style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>{aiError}</p>}
+            {aiSavedMsg && <p data-testid="settings-key-saved-msg" style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Btn testId="settings-save-key-btn" onClick={saveAiConfig} disabled={!aiKeyDraft.trim() || aiSaving} small>{aiSaving ? "Saving…" : "Save Key"}</Btn>
+              {aiConfig.configured && (
+                <button data-testid="settings-remove-key-btn" onClick={removeAiConfig}
+                  style={{ fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
+                  Remove key
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-
-        {/* API key for selected provider */}
-        <div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>
-            API Key — {p.name}
-          </label>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input data-testid="settings-api-key-input" type={showKey ? "text" : "password"} value={draft} onChange={e => setDraft(e.target.value)}
-              placeholder={p.keyHint}
-              style={{ ...inputS, flex: 1, border: `1.5px solid ${draft && !valid ? RED.border : "var(--color-border-primary)"}` }} />
-            <button data-testid="settings-show-hide-key-btn" onClick={() => setShowKey(v => !v)}
-              style={{ padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff", fontFamily: "var(--font-sans)" }}>
-              {showKey ? "Hide" : "Show"}
-            </button>
+        ) : (
+          <div style={{ background: currentKey ? TEAL.bg : AMBER.bg, border: `1px solid ${currentKey ? TEAL.border : AMBER.border}`, borderRadius: 10, padding: "12px 14px" }}>
+            <p data-testid="settings-ai-status-readonly" style={{ fontSize: 13, color: currentKey ? TEAL.text : AMBER.text, margin: 0, lineHeight: 1.6 }}>
+              {currentKey
+                ? `✅ AI is enabled — managed centrally by your administrator (${getProvider(provider).name}).`
+                : "⚠️ AI features aren't configured yet. Ask your administrator to add an API key."}
+            </p>
           </div>
-          {draft && !valid && <p data-testid="settings-key-invalid-msg" style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
-          {saved && <p data-testid="settings-key-saved-msg" style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
-          <Btn testId="settings-save-key-btn" onClick={save} disabled={!valid} small>Save Key</Btn>
-          {draft && apiKeyFor(provider) && (
-            <button data-testid="settings-remove-key-btn" onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
-              style={{ marginLeft: 10, fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
-              Remove key
-            </button>
-          )}
-        </div>
+        )}
 
         {/* Admin: Agent Instructions */}
         <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
@@ -904,7 +942,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
 }
 
 // ─── Complaint Library ────────────────────────────────────────────────────────
-function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
+function ComplaintCard({ complaint, selected, onEdit, onSelect, onPublish }) {
   const [hov, setHov] = useState(false);
   const hasWorkflow = !!complaint.workflow;
   return (
@@ -914,8 +952,14 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
       onClick={onSelect}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: hasWorkflow ? TEAL.primary : AMBER.primary, flexShrink: 0, marginTop: 4 }} />
-        <button data-testid={`complaint-card-${complaint.id}-edit-btn`} onClick={e => { e.stopPropagation(); onEdit(); }}
-          style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>✏️</button>
+        <div style={{ display: "flex", gap: 6 }}>
+          {onPublish && (
+            <button data-testid={`complaint-card-${complaint.id}-publish-btn`} onClick={e => { e.stopPropagation(); onPublish(); }} title="Publish to Community"
+              style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>🌐</button>
+          )}
+          <button data-testid={`complaint-card-${complaint.id}-edit-btn`} onClick={e => { e.stopPropagation(); onEdit(); }}
+            style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>✏️</button>
+        </div>
       </div>
       <p style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-primary)", margin: "0 0 6px", lineHeight: 1.4 }}>{complaint.name}</p>
       <span style={{ fontSize: 11, color: "var(--color-text-secondary)", background: "var(--color-background-secondary)", padding: "2px 6px", borderRadius: 4 }}>{complaint.category}</span>
@@ -923,11 +967,14 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
   );
 }
 
-function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onModeChange }) {
+function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onModeChange, onPublish, onImport }) {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
   const [tab, setTab] = useState("AI");
-  
+  const [communityItems, setCommunityItems] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [myRating, setMyRating] = useState({});
+
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -939,9 +986,21 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
     setTab(t);
     onModeChange?.(t === "AI");
     if (t === "AI") setSelected(null);
+    if (t === "Community" && communityItems.length === 0) {
+      setCommunityLoading(true);
+      listCommunityWorkflows().then(setCommunityItems).catch(() => setCommunityItems([])).finally(() => setCommunityLoading(false));
+    }
   };
 
-  const source = tab === "System" ? SYSTEM_COMPLAINTS : tab === "AI" ? [] : customComplaints.filter(c => c.source === (tab === "Private" ? "private" : "community"));
+  const rateCommunityItem = async (id, stars) => {
+    setMyRating(prev => ({ ...prev, [id]: stars }));
+    try {
+      const updated = await rateWorkflow(id, stars);
+      setCommunityItems(prev => prev.map(i => i.id === id ? updated : i));
+    } catch { /* silent */ }
+  };
+
+  const source = tab === "System" ? SYSTEM_COMPLAINTS : tab === "AI" || tab === "Community" ? [] : customComplaints.filter(c => c.source === "private");
 
   const filtered = source.filter(c => {
     const matchCat = cat === "All" || c.category === cat;
@@ -987,6 +1046,30 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
             </ul>
           </div>
           <p style={{ fontSize: 11, color: "#5050A0", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>
+        </div>
+      ) : tab === "Community" ? (
+        <div data-testid="community-workflows-panel" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {communityLoading ? <p style={{ textAlign: "center", color: "var(--color-text-secondary)", fontSize: 13, padding: 20 }}>Loading…</p>
+            : communityItems.length === 0 ? <p data-testid="community-workflows-empty" style={{ textAlign: "center", color: "var(--color-text-secondary)", fontSize: 13, padding: 20 }}>No custom workflows published yet — publish one from your Private tab!</p>
+            : communityItems.map(item => (
+              <div key={item.id} data-testid={`community-workflow-${item.id}`} style={{ border: "1.5px solid var(--color-border-primary)", borderRadius: 10, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 2px" }}>{item.name}</p>
+                    <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>by {item.owner_name} · {item.category}</p>
+                  </div>
+                  <button data-testid={`community-workflow-import-${item.id}`} onClick={() => onImport(item)}
+                    style={{ fontSize: 11.5, fontWeight: 700, color: TEAL.primary, background: TEAL.bg, border: "none", borderRadius: 8, padding: "5px 10px", cursor: "pointer", flexShrink: 0 }}>+ Import</button>
+                </div>
+                <div style={{ display: "flex", gap: 2 }}>
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} data-testid={`community-workflow-rate-${item.id}-${n}`} onClick={() => rateCommunityItem(item.id, n)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 0, color: (myRating[item.id] || 0) >= n ? "#f59e0b" : "#e2e8f0" }}>★</button>
+                  ))}
+                  {item.rating_count > 0 && <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 4 }}>{item.avg_rating} ({item.rating_count})</span>}
+                </div>
+              </div>
+            ))}
         </div>
       ) : isMobile ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -1050,7 +1133,8 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8, maxHeight: 280, overflowY: "auto" }}>
             {filtered.map(c => (
               <ComplaintCard key={c.id} complaint={c} selected={selected?.id === c.id}
-                onEdit={() => onEdit(c)} onSelect={() => setSelected(c)} />
+                onEdit={() => onEdit(c)} onSelect={() => setSelected(c)}
+                onPublish={tab === "Private" ? () => onPublish(c) : null} />
             ))}
             {!filtered.length && <p style={{ gridColumn: "1/-1", textAlign: "center", color: "var(--color-text-secondary)", fontSize: 13, padding: 20 }}>No complaints found.</p>}
           </div>
@@ -1083,6 +1167,8 @@ function ProductToggle({ product, setProduct }) {
 // ─── Profile Modal ────────────────────────────────────────────────────────────
 function ProfileModal({ onClose, onSettings }) {
   const { user, logout } = useAuth();
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const professionLabels = { mbbs_student: "MBBS Student", resident: "Resident", consultant: "Consultant" };
   return (
     <div data-testid="profile-modal-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
@@ -1111,7 +1197,15 @@ function ProfileModal({ onClose, onSettings }) {
               <p data-testid="profile-modal-mobile" style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>{user?.mobile_number || "No number"}</p>
             </div>
           </div>
-          <button data-testid="profile-modal-open-settings-btn" onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          <button data-testid="profile-modal-open-records-btn" onClick={() => setRecordsOpen(true)} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-primary)", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            📁 My Records
+          </button>
+          {user?.role === "admin" && (
+            <button data-testid="profile-modal-open-admin-dashboard-btn" onClick={() => setAdminOpen(true)} style={{ width: "100%", marginTop: 8, padding: "11px", borderRadius: 10, border: "1.5px solid " + PURPLE.border, background: PURPLE.bg, color: PURPLE.primary, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              🛠 Admin Dashboard
+            </button>
+          )}
+          <button data-testid="profile-modal-open-settings-btn" onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 8, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             ⚙️ Open Settings
           </button>
           <button data-testid="profile-modal-logout-btn" onClick={() => { onClose(); logout(); }} style={{ width: "100%", marginTop: 8, padding: "11px", borderRadius: 10, border: "1.5px solid #fecdd3", background: "#fff", color: "#e11d48", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
@@ -1119,6 +1213,8 @@ function ProfileModal({ onClose, onSettings }) {
           </button>
         </div>
       </div>
+      {recordsOpen && <RecordsModal onClose={() => setRecordsOpen(false)} />}
+      {adminOpen && <AdminDashboard onClose={() => setAdminOpen(false)} />}
     </div>
   );
 }
@@ -1215,6 +1311,24 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
     setEditing(undefined);
   };
 
+  const publishWorkflowHandler = async (c) => {
+    try {
+      await publishWorkflow({ name: c.name, category: c.category, tags: c.tags || [], workflow: c.workflow || {} });
+      alert(`"${c.name}" published to the community! Other users can now find and rate it.`);
+    } catch (err) {
+      alert("Could not publish: " + err.message);
+    }
+  };
+
+  const importWorkflowHandler = (item) => {
+    const rec = { id: (item.name || "complaint").toLowerCase().replace(/\s+/g, "_") + "_" + Date.now(), name: item.name + " (community)", category: item.category, tags: item.tags || [], workflow: item.workflow, source: "private", createdAt: new Date().toISOString() };
+    const prev = JSON.parse(localStorage.getItem("clinicalmind:complaints") || "[]");
+    const next = [...prev, rec];
+    localStorage.setItem("clinicalmind:complaints", JSON.stringify(next));
+    setCustomComplaints(next);
+    alert(`"${item.name}" imported into your Private complaints!`);
+  };
+
   const openEdit = (c) => {
     setEditingNoAiNotice(false);
     if (c?.source === "system") {
@@ -1298,7 +1412,8 @@ Return ONLY valid JSON with this exact structure:
           <Card><DocumentVault pdfDocs={pdfDocs} setPdfDocs={setPdfDocs} idx={idx} tagLibrary={tagLibrary} setTagLibrary={setTagLibrary} pdfBuffers={pdfBuffers}
             onOpenReader={(doc, initPage) => setReaderState({ doc, initPage: initPage || 1 })}
             onOpenTagLibrary={() => setTagLibraryOpen(true)} /></Card>
-          <Card><ComplaintLibrary selected={selected} setSelected={setSelected} onEdit={openEdit} customComplaints={customComplaints} onModeChange={setIsAiMode} /></Card>
+          <Card><ComplaintLibrary selected={selected} setSelected={setSelected} onEdit={openEdit} customComplaints={customComplaints} onModeChange={setIsAiMode}
+            onPublish={publishWorkflowHandler} onImport={importWorkflowHandler} /></Card>
         </div>
 
         <Card className="start-card" style={{
@@ -2735,27 +2850,36 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [aiUsed, setAiUsed] = useState(false);
+  const [savedCaseId, setSavedCaseId] = useState(null);
 
   useEffect(() => {
     (async () => {
       if (!apiKey) {
         // Fully offline note
-        setNote(generateLocalNote(session.complaint.name, session.age, session.sex, history, differentials, redFlags));
+        const localNote = generateLocalNote(session.complaint.name, session.age, session.sex, history, differentials, redFlags);
+        setNote(localNote);
         setLoading(false);
+        const saved = await saveCaseRecord({ complaint: session.complaint.name, age: session.age, sex: session.sex, history, differentials, red_flags: redFlags, note_text: localNote });
+        if (saved?.id) setSavedCaseId(saved.id);
         return;
       }
       setAiUsed(true);
       try {
+        let finalNote = "";
         await callAIStream(
           [{ role: "user", content: buildNotePrompt(session.complaint.name, session.age, session.sex, history, differentials, redFlags) }],
           "You are a clinical documentation assistant for Indian government hospitals. Output structured clinical notes only.",
-          provider, apiKey, t => setNote(t)
+          provider, apiKey, t => { finalNote = t; setNote(t); }
         );
+        const saved = await saveCaseRecord({ complaint: session.complaint.name, age: session.age, sex: session.sex, history, differentials, red_flags: redFlags, note_text: finalNote });
+        if (saved?.id) setSavedCaseId(saved.id);
       } catch (e) {
         // Fallback to local note on API error
         const localNote = generateLocalNote(session.complaint.name, session.age, session.sex, history, differentials, redFlags);
         setNote(localNote + `\n\n[AI error: ${e.message} — local note generated]`);
         setAiUsed(false);
+        const saved = await saveCaseRecord({ complaint: session.complaint.name, age: session.age, sex: session.sex, history, differentials, red_flags: redFlags, note_text: localNote });
+        if (saved?.id) setSavedCaseId(saved.id);
       } finally { setLoading(false); }
     })();
   }, []);
@@ -2797,16 +2921,18 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
           </div>
         )}
       </div>
+      {savedCaseId && <RatingPrompt recordType="case" recordId={savedCaseId} onDismiss={() => setSavedCaseId(null)} />}
     </div>
   );
 }
 
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
+  const { user } = useAuth();
   const [product, setProduct] = useState(null); // null = Home Screen, "clinicalmind" | "supersummary"
   const [phase, setPhase] = useState("library");
-  const [provider, setProvider] = useState(() => localStorage.getItem("clinicalmind:provider") || "claude");
-  const [apiKey, setApiKey] = useState(() => apiKeyFor(localStorage.getItem("clinicalmind:provider") || "claude"));
+  const [provider, setProvider] = useState("claude");
+  const [apiKey, setApiKey] = useState(""); // truthy only when backend AI is configured ("backend-managed" sentinel)
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [session, setSession] = useState(null);
   const [noteData, setNoteData] = useState(null);
@@ -2818,15 +2944,23 @@ export default function App() {
   const pdfBuffers = useRef(new Map());
   const idx = useRef(new BM25()).current;
 
-  const handleProviderChange = (id) => {
-    setProvider(id);
-    setApiKey(apiKeyFor(id));
-    localStorage.setItem("clinicalmind:provider", id);
+  const refreshAiStatus = () => {
+    const API_URL = import.meta.env.REACT_APP_BACKEND_URL;
+    fetch(`${API_URL}/api/ai/status`, { credentials: "include" })
+      .then(r => r.json())
+      .then(data => {
+        setProvider(data.provider || "claude");
+        setApiKey(data.configured ? "backend-managed" : "");
+      })
+      .catch(() => setApiKey(""));
   };
 
-  const handleKeyChange = (key) => {
-    setApiKey(key);
-  };
+  useEffect(() => { refreshAiStatus(); }, []);
+
+  // Provider/key are now managed centrally by the admin — these are no-ops for regular
+  // users and are only reachable via the admin-only settings UI, which calls refreshAiStatus().
+  const handleProviderChange = () => {};
+  const handleKeyChange = () => { refreshAiStatus(); };
 
   const goNote = (history, differentials, redFlags) => { setNoteData({ history, differentials, redFlags }); setPhase("note"); };
   const reset = () => { setSession(null); setNoteData(null); setPhase("library"); };

@@ -1,0 +1,59 @@
+{
+  "summary": "Tested Phase 2-7 features on top of already-passing Phase 1 auth (iteration_6): admin-only masked AI key config, restructured SuperSummary (AI Mode card + simplified Template Library), discharge summary/clinical case persistence + My Records modal, non-blocking rating widget, Admin Dashboard (stats/users/summaries/cases/ratings), and Community publish/rate/import for both templates and workflows. 31/31 new backend pytest cases passed (plus 11/11 pre-existing auth tests still pass = 42/42 total). Found and FIXED one high-priority frontend bug (AdminDashboard modal closing on any inner click). Found and REPORTED one backend architectural bug (streaming AI proxy silently truncates to empty response on invalid key instead of surfacing an error, breaking the documented 'graceful fallback to local note' behavior).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/ai/chat/stream (admin_ai.py: _stream_claude/_stream_gemini/_stream_openai_compat)",
+        "issue": "When the admin-configured AI key is invalid/fake, the upstream provider call fails (e.g. Claude returns 401) AFTER the StreamingResponse has already sent HTTP 200 headers to the client. The code raises `HTTPException(status_code=502, ...)` from inside the async generator, which cannot change an already-committed response - it just aborts the stream, producing an unhandled ExceptionGroup in the ASGI app (visible in backend logs) and an EMPTY response body reaching the frontend. Frontend's callAIStream() sees res.ok===true (200) and never throws, so NoteScreen/SuperFastAiWizard's try/catch never triggers the intended 'fallback to local note' path - it silently saves an EMPTY note_text to the case record instead of a local offline note. This breaks the explicitly documented requirement that AI failures gracefully fall back to a local/offline note.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AdminDashboard.jsx (admin-dashboard-overlay)",
+        "issue": "FIXED DURING TESTING: The modal's inner content div was missing `onClick={e => e.stopPropagation()}`. Since AdminDashboard is rendered as a nested child inside ProfileModal's own overlay div (which has `onClick={onClose}` for backdrop-dismiss), ANY click inside the Admin Dashboard - including switching tabs (Users/Discharge Summaries/Clinical Cases/Ratings) - bubbled up and closed both the Admin Dashboard AND the Profile Modal entirely, making the Users/Summaries/Cases/Ratings tabs completely unusable. Fixed by adding stopPropagation to the inner content div (same pattern already correctly used in RecordsModal.jsx and CommunityBrowserModal.jsx). Verified fix: Users tab now renders full user table, Ratings tab works, modal stays open.",
+        "selector": "admin-dashboard-overlay / admin-tab-users",
+        "priority": "HIGH - FIXED"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Clinical case note generation with AI configured (fake/invalid key)",
+        "issue": "See backend critical issue above - NoteScreen shows 'via Claude (Anthropic)' and an empty note body instead of falling back to a local note with an error message appended, because the backend streaming proxy swallows the mid-stream 502 error.",
+        "affected_selectors": ["copy-note-btn (empty text)"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2_features.py",
+    "/app/backend/tests/test_auth.py",
+    "/app/test_reports/pytest/pytest_results_phase2.xml"
+  ],
+  "action_items": [
+    "Fix admin_ai.py streaming functions (_stream_claude/_stream_gemini/_stream_openai_compat) to check upstream provider response status BEFORE starting to yield/stream to the client, so an invalid-key error can be returned as a proper non-200 JSON error response (as it already correctly does for the initial non-streaming status check). One approach: make the initial upstream HTTP call non-streamed first few bytes/status check, or wrap generator to catch exceptions and yield a client-recognizable sentinel/error marker that the frontend can detect even at 200 status, then have frontend explicitly check for that sentinel and fall back to generateLocalNote().",
+    "No other action items - all other Phase 2-7 features (admin key masking/gating, SuperSummary restructure, records persistence, rating widget, admin dashboard aggregation, community publish/rate/import for templates AND workflows) verified working correctly end-to-end.",
+    "Clean up test data: multiple TEST_user_*/TEST_* prefixed users, templates (TEST_MyTemplate_*, TEST_RateTemplate_*, TEST_Template_* etc), and workflows (TEST_Workflow_*) created during pytest + Playwright runs, plus the shared adityasonofashok@gmail.com admin test account (password TestAdminPass123) - see test_credentials note below."
+  ],
+  "critical_code_review_comments": [
+    "admin_ai.py: _mask() and the admin/user AI-config endpoints are clean and correctly gate key visibility (403 for non-admin, no key ever returned to regular users via /api/ai/status). Good separation of concerns.",
+    "records.py and community.py: consistently async/await, proper Pydantic validation, correct 400/403/404 codes, _id excluded from all responses, ownership checks on delete (community unpublish returns 404 for non-owners, not silently succeeding).",
+    "community.py rate logic (_rate helper) correctly upserts per-user rating and recomputes running sum/count rather than storing raw arrays - efficient and correct, verified re-rating updates avg without double counting.",
+    "AdminDashboard.jsx bug (fixed) highlights a pattern worth auditing elsewhere: any future modal nested inside another modal MUST stopPropagation on its inner content wrapper. RecordsModal.jsx and CommunityBrowserModal.jsx already do this correctly, but AdminDashboard.jsx originally did not (now fixed).",
+    "Streaming AI proxy design flaw (see critical issue) is a general FastAPI StreamingResponse anti-pattern - raising HTTPException from within an async generator after the response has started is a known limitation, should use a wrapping try/except inside the generator itself with an error sentinel in the byte stream."
+  ],
+  "updated_files": [
+    "/app/frontend/src/AdminDashboard.jsx (bug fix: added stopPropagation + onClick={onClose} on overlay for consistency)",
+    "/app/backend/tests/test_phase2_features.py (new)"
+  ],
+  "success_rate": {"backend": "100% (42/42 pytest: 31 new + 11 pre-existing auth)", "frontend": "~95% (all flows passed after 1 bug found+fixed; 1 backend-rooted AI-fallback issue remains and needs main agent fix)"},
+  "test_credentials": "Admin: adityasonofashok@gmail.com / TestAdminPass123 (created during this test pass, pre-existing per iteration_6 notes that it should be cleaned up - still present). Multiple TEST_user_*/example.com regular accounts created via signup, all password SecurePass123. See action_items for full cleanup list.",
+  "seed_data_creation": "Created ~10 regular TEST_ users via signup, several TEST_ prefixed templates and workflows (published to community + imported), several summaries/cases/ratings via UI flows, plus pytest-created TEST_ records/community items and one admin AI config entry (provider=claude, fake key) in admin_settings collection.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "All CRUD/gating/persistence/publish/rate/import mechanics are solid (backend 100% pytest pass, all Playwright flows for signup/onboarding/SuperSummary restructure/records/admin dashboard/community verified). The ONE remaining real bug is backend-only: admin_ai.py's streaming chat proxy doesn't properly surface upstream provider errors that occur after the stream has started (confirmed via backend logs showing an unhandled ExceptionGroup with the underlying 502 HTTPException), causing empty/truncated AI notes/summaries to be silently saved instead of the intended local-note fallback. This only manifests when an AI key IS configured but INVALID (not when no key is configured at all - that path correctly uses generateLocalNote() immediately). Recommend fixing by wrapping the upstream call+first-chunk check before starting to stream, or catching exceptions inside the generator functions themselves and yielding a recognizable error marker for the frontend to detect and react to.",
+  "rca_of_the_issue": "AdminDashboard bug: modal-in-modal without stopPropagation on inner wrapper caused backdrop onClick to fire on any inner interaction, closing the whole modal tree - fixed by adding stopPropagation (consistent with RecordsModal.jsx/CommunityBrowserModal.jsx pattern). Streaming AI bug: FastAPI's StreamingResponse commits HTTP 200 status as soon as the generator starts yielding/is returned; raising an HTTPException from inside the generator after that point cannot change the status code and instead surfaces as an unhandled ASGI exception, terminating the stream with whatever partial (possibly empty) content was yielded so far - the frontend sees a 200 response with an incomplete/empty body and does not know the intended AI call actually failed, so it never falls into the designed try/catch fallback-to-local-note logic."
+}

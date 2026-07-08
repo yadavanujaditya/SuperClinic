@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 
 from database import db, client
 import auth
+import admin_ai
+import records
+import community
 
 # Create the main app without a prefix
 app = FastAPI()
@@ -60,6 +63,9 @@ async def get_status_checks():
 # Include the router in the main app
 app.include_router(api_router)
 app.include_router(auth.router)
+app.include_router(admin_ai.router)
+app.include_router(records.router)
+app.include_router(community.router)
 
 app.add_middleware(
     CORSMiddleware,

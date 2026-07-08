@@ -1,4 +1,8 @@
 // Multi-provider AI streaming — Claude, Gemini, DeepSeek, OpenAI
+// NOTE: All AI calls are proxied through the backend, which uses the admin-configured
+// API key server-side. Regular users never need or see an API key.
+
+const API_URL = import.meta.env.REACT_APP_BACKEND_URL;
 
 export const PROVIDERS = [
   { id: "claude",   name: "Claude (Anthropic)",  keyPrefix: "sk-ant-", keyHint: "sk-ant-...",  model: "claude-sonnet-4-6" },
@@ -9,199 +13,46 @@ export const PROVIDERS = [
 
 export function getProvider(id) { return PROVIDERS.find(p => p.id === id) || PROVIDERS[0]; }
 
-// ── Claude (Anthropic) ──────────────────────────────────────────────────────
-async function streamClaude(messages, system, apiKey, model, onDelta) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({ model, max_tokens: 4096, stream: true, system, messages }),
-  });
-  if (!res.ok) throw new Error(`Claude API ${res.status}: ${await res.text()}`);
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let full = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    for (const line of dec.decode(value, { stream: true }).split("\n")) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (!data) continue;
-      try {
-        const ev = JSON.parse(data);
-        if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
-          full += ev.delta.text; onDelta?.(full);
-        }
-      } catch (_) {}
-    }
-  }
-  return full;
-}
-
-// ── Gemini (Google) ─────────────────────────────────────────────────────────
-async function streamGemini(messages, system, apiKey, model, onDelta) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-  const contents = messages.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-  // gemini-2.5-flash can fully disable thinking (budget 0); gemini-2.5-pro requires a minimum budget of 128
-  const thinkingBudget = model.includes("pro") ? 128 : 0;
-  const body = {
-    contents,
-    systemInstruction: system ? { parts: [{ text: system }] } : undefined,
-    generationConfig: { maxOutputTokens: 4096, thinkingConfig: { thinkingBudget } },
-  };
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new Error(`Gemini API ${res.status}: ${await res.text()}`);
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let full = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    for (const line of dec.decode(value, { stream: true }).split("\n")) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (!data || data === "[DONE]") continue;
-      try {
-        const ev = JSON.parse(data);
-        // gemini-2.5 returns parts array; skip thought:true parts (thinking tokens)
-        const parts = ev.candidates?.[0]?.content?.parts || [];
-        for (const part of parts) {
-          if (!part.thought && part.text) { full += part.text; onDelta?.(full); }
-        }
-      } catch (_) {}
-    }
-  }
-  return full;
-}
-
-// ── OpenAI-compatible (DeepSeek, OpenAI) ────────────────────────────────────
-async function streamOpenAICompat(messages, system, apiKey, model, onDelta, baseURL) {
-  const res = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model, max_tokens: 4096, stream: true,
-      messages: [
-        ...(system ? [{ role: "system", content: system }] : []),
-        ...messages,
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let full = "";
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    for (const line of dec.decode(value, { stream: true }).split("\n")) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (!data || data === "[DONE]") continue;
-      try {
-        const ev = JSON.parse(data);
-        const text = ev.choices?.[0]?.delta?.content;
-        if (text) { full += text; onDelta?.(full); }
-      } catch (_) {}
-    }
-  }
-  return full;
-}
-
-// ── Unified entry point ──────────────────────────────────────────────────────
+// ── Unified entry point — streams via backend proxy (admin-managed key) ────
 export async function callAIStream(messages, system, provider, apiKey, onDelta) {
-  const p = getProvider(provider);
-  switch (provider) {
-    case "claude":
-      return streamClaude(messages, system, apiKey, p.model, onDelta);
-    case "gemini":
-      return streamGemini(messages, system, apiKey, p.model, onDelta);
-    case "deepseek":
-      return streamOpenAICompat(messages, system, apiKey, p.model, onDelta, "https://api.deepseek.com/v1");
-    case "openai":
-      return streamOpenAICompat(messages, system, apiKey, p.model, onDelta, "https://api.openai.com/v1");
-    default:
-      return streamClaude(messages, system, apiKey, p.model, onDelta);
+  const res = await fetch(`${API_URL}/api/ai/chat/stream`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, system }),
+  });
+  if (!res.ok || !res.body) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.detail || `AI request failed (${res.status})`);
   }
-}
-
-// ── Vision (image → text) — used as OCR fallback when Tesseract fails/low-confidence ──
-async function visionClaude(base64, mediaType, prompt, apiKey, model) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-      "x-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      model, max_tokens: 2048,
-      messages: [{ role: "user", content: [
-        { type: "image", source: { type: "base64", media_type: mediaType, data: base64 } },
-        { type: "text", text: prompt },
-      ] }],
-    }),
-  });
-  if (!res.ok) throw new Error(`Claude vision API ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  return json.content?.map(c => c.text).join("") || "";
-}
-
-async function visionGemini(base64, mediaType, prompt, apiKey, model) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-  const res = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ inline_data: { mime_type: mediaType, data: base64 } }, { text: prompt }] }],
-      generationConfig: { maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: model.includes("pro") ? 128 : 0 } },
-    }),
-  });
-  if (!res.ok) throw new Error(`Gemini vision API ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const parts = json.candidates?.[0]?.content?.parts || [];
-  return parts.filter(p => !p.thought).map(p => p.text).join("");
-}
-
-async function visionOpenAI(base64, mediaType, prompt, apiKey, model) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model, max_tokens: 2048,
-      messages: [{ role: "user", content: [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: `data:${mediaType};base64,${base64}` } },
-      ] }],
-    }),
-  });
-  if (!res.ok) throw new Error(`OpenAI vision API ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  return json.choices?.[0]?.message?.content || "";
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let full = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    full += dec.decode(value, { stream: true });
+    onDelta?.(full);
+  }
+  return full;
 }
 
 // Reads an image (dataURL) and transcribes/describes its content as plain text — used as an OCR
 // fallback for handwritten or low-quality scans that Tesseract.js can't reliably read.
 export async function callVisionOCR(imageDataURL, provider, apiKey) {
-  const p = getProvider(provider);
   const match = imageDataURL.match(/^data:(.+?);base64,(.+)$/);
   if (!match) throw new Error("Invalid image data");
   const [, mediaType, base64] = match;
   const prompt = "Transcribe every piece of text visible in this medical document image exactly as written, including all numbers, lab values, dates, and handwritten notes. Output plain text only, preserving line structure. Do not summarize or omit anything.";
-  switch (provider) {
-    case "claude": return visionClaude(base64, mediaType, prompt, apiKey, p.model);
-    case "gemini": return visionGemini(base64, mediaType, prompt, apiKey, p.model);
-    case "openai": return visionOpenAI(base64, mediaType, prompt, apiKey, p.model);
-    default: throw new Error(`${p.name} does not support image OCR — use Claude, Gemini, or OpenAI.`);
-  }
+  const res = await fetch(`${API_URL}/api/ai/vision`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_base64: base64, media_type: mediaType, prompt }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || `Vision OCR failed (${res.status})`);
+  return data.text || "";
 }
 
 export function parseJSON(raw) {
