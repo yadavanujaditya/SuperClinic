@@ -198,6 +198,21 @@ export function IllustSafety() {
   );
 }
 
+export function IllustGame() {
+  return (
+    <IllustBase bg="#ecfeff">
+      <circle cx="150" cy="95" r="58" fill="#cffafe" />
+      <path d="M110 80 h80 a10 10 0 0 1 10 10 v18 a18 18 0 0 1 -18 18 h-6 l-10 14 h-32 l-10 -14 h-6 a18 18 0 0 1 -18 -18 v-18 a10 10 0 0 1 10 -10 Z" fill="#0891b2" />
+      <circle cx="132" cy="100" r="6" fill="#fff" />
+      <circle cx="168" cy="100" r="6" fill="#fff" />
+      <rect x="122" y="94" width="10" height="4" rx="2" fill="#0891b2" />
+      <rect x="126" y="90" width="4" height="12" rx="2" fill="#0891b2" />
+      <circle cx="150" cy="46" r="16" fill="#fbbf24" />
+      <path d="M150 38 l3.2 6.5 7.2 1 -5.2 5 1.2 7.2 -6.4 -3.4 -6.4 3.4 1.2 -7.2 -5.2 -5 7.2 -1 Z" fill="#fff" />
+    </IllustBase>
+  );
+}
+
 // Small auto-rotating illustration carousel used inside a card (replaces a single static image).
 export function CardCarousel({ slides, accent = "#0d9488", height = 170 }) {
   const [i, setI] = useState(0);
@@ -238,7 +253,7 @@ export function AppFooter() {
           style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", padding: "10px 18px", borderRadius: 30,
             background: "linear-gradient(120deg,#2AABEE,#229ED9)", color: "#fff", fontWeight: 700, fontSize: 13.5, boxShadow: "0 8px 20px rgba(34,158,217,0.28)" }}>
           <svg width="20" height="20" viewBox="0 0 496 512" fill="#fff"><path d="M248 8C111 8 0 119 0 256s111 248 248 248 248-111 248-248S385 8 248 8zm121.8 169.9l-40.7 191.8c-3.1 13.8-11.1 17.2-22.6 10.7l-62.5-46.1-30.1 29c-3.3 3.3-6.1 6.1-12.6 6.1l4.5-63.9L328 178.1c5.1-4.5-1.1-7-7.9-2.5L163.6 274l-61.2-19.1c-13.3-4.2-13.6-13.3 2.8-19.7l239.4-92.3c11.1-4 20.8 2.7 17.2 19.5z"/></svg>
-          Chat on Telegram · @yadavanujaditya
+          Chat on Telegram
         </a>
       </div>
       <div style={{ borderTop: "1px solid var(--color-border-primary)", padding: "14px 20px", textAlign: "center" }}>

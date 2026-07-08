@@ -3,7 +3,7 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
-import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, AppFooter } from "./HomeHero.jsx";
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, AppFooter } from "./HomeHero.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -784,6 +784,9 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
   if (!expanded) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 2 }}>
+          <CardCarousel accent={PURPLE.primary} height={110} slides={[IllustLibrary, IllustDocs]} />
+        </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
           <span style={{ fontSize: 10, background: PURPLE.bg, color: PURPLE.primary, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>AI INDEXED</span>
@@ -950,16 +953,17 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["System","Private","Community","AI"].map(t => (
           <button key={t} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-            borderColor: tab === t ? (t === "AI" ? "#5B5BDB" : TEAL.primary) : "var(--color-border-primary)",
-            background: tab === t ? (t === "AI" ? "#1E1E2E" : TEAL.bg) : "#fff",
-            color: tab === t ? (t === "AI" ? "#A5A5FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
+            borderColor: tab === t ? (t === "AI" ? "#A855F7" : TEAL.primary) : "var(--color-border-primary)",
+            background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : TEAL.bg) : "#fff",
+            boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
+            color: tab === t ? (t === "AI" ? "#F3E8FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
             {t === "AI" ? "✨ AI Mode" : t}
           </button>
         ))}
       </div>
 
       {tab === "AI" ? (
-        <div style={{ background: "linear-gradient(135deg,#1E1E2E,#2A1A4E)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 28 }}>✨</span>
             <div>
@@ -1283,8 +1287,8 @@ Return ONLY valid JSON with this exact structure:
         </div>
 
         <Card className="start-card" style={{
-          background: isAiMode ? "linear-gradient(135deg,#1E1E2E,#2A1A4E)" : "#fff",
-          border: isAiMode ? "1.5px solid #5B5BDB" : "1.5px solid var(--color-border-primary)" }}>
+          background: isAiMode ? "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)" : "#fff",
+          border: isAiMode ? "1.5px solid #8B5CF6" : "1.5px solid var(--color-border-primary)" }}>
 
           {/* Complaint selector / AI text input */}
           {isAiMode ? (
@@ -1292,7 +1296,7 @@ Return ONLY valid JSON with this exact structure:
               <label style={{ fontSize: 13, fontWeight: 600, color: "#9090C0", display: "block", marginBottom: 4 }}>Chief Complaint</label>
               <input value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
                 placeholder="e.g. Fever for 3 days, Abdominal pain…"
-                style={{ padding: "9px 12px", border: "1.5px solid #5B5BDB", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
+                style={{ padding: "9px 12px", border: "1.5px solid #8B5CF6", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
             </div>
           ) : selected ? (
             <div style={{ background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 8, padding: "8px 14px" }}>
@@ -1308,10 +1312,10 @@ Return ONLY valid JSON with this exact structure:
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Patient Age</label>
             <div style={{ display: "flex", gap: 6 }}>
               <input type="number" min={0} value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
-                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
+                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }} />
               <select value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
-                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
+                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }}>
                 <option value="years">Years</option>
                 <option value="months">Months</option>
@@ -1326,9 +1330,9 @@ Return ONLY valid JSON with this exact structure:
             <div style={{ display: "flex", gap: 6 }}>
               {["Male","Female","Other"].map(s => (
                 <button key={s} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-                  borderColor: sex === s ? (isAiMode ? "#5B5BDB" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  borderColor: sex === s ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: sex === s ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
-                  color: sex === s ? (isAiMode ? "#A5A5FF" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
+                  color: sex === s ? (isAiMode ? "#D8B4FE" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
                   {s}
                 </button>
               ))}
@@ -1343,19 +1347,19 @@ Return ONLY valid JSON with this exact structure:
                 onClick={() => setConsultMode("learning")}
                 style={{
                   padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
-                  borderColor: consultMode === "learning" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  borderColor: consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: consultMode === "learning" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
                   transition: "all 0.15s"
                 }}
               >
                 <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
-                  <path d="M4 6 C10 2 18 2 24 6 V30 C18 26 10 26 4 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : "#94a3b8"} opacity="0.85" />
+                  <path d="M4 6 C10 2 18 2 24 6 V30 C18 26 10 26 4 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} opacity="0.85" />
                   <path d="M44 6 C38 2 30 2 24 6 V30 C30 26 38 26 44 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B8BFF" : TEAL.light) : "#cbd5e1"} />
                   <line x1="24" y1="6" x2="24" y2="30" stroke="#fff" strokeWidth="1.5" opacity="0.6" />
                 </svg>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 14 }}>📖</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "learning" ? (isAiMode ? "#A5A5FF" : TEAL.primary) : "var(--color-text-primary)" }}>Learning Mode</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "learning" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>Learning Mode</span>
                 </div>
                 <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
                   Follows the standard structured sequential clinical workflow (one question at a time).
@@ -1372,19 +1376,19 @@ Return ONLY valid JSON with this exact structure:
                 }}
                 style={{
                   padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
-                  borderColor: consultMode === "opd" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  borderColor: consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: consultMode === "opd" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
                   opacity: hasKey ? 1 : 0.6,
                   transition: "all 0.15s"
                 }}
               >
                 <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
-                  <path d="M27 2 L10 20 h9 l-4 14 L33 16 h-9 Z" fill={consultMode === "opd" ? (isAiMode ? "#5B5BDB" : TEAL.primary) : "#94a3b8"} />
-                  <circle cx="24" cy="18" r="16" fill="none" stroke={consultMode === "opd" ? (isAiMode ? "#5B5BDB" : TEAL.light) : "#cbd5e1"} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
+                  <path d="M27 2 L10 20 h9 l-4 14 L33 16 h-9 Z" fill={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} />
+                  <circle cx="24" cy="18" r="16" fill="none" stroke={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.light) : "#cbd5e1"} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
                 </svg>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 14 }}>⚡</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "opd" ? (isAiMode ? "#A5A5FF" : TEAL.primary) : "var(--color-text-primary)" }}>OPD Mode</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "opd" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>OPD Mode</span>
                 </div>
                 <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
                   Fast-track mode. AI asks 3–4 questions simultaneously to quickly update differentials.
@@ -1401,7 +1405,7 @@ Return ONLY valid JSON with this exact structure:
                 complaint: { id: "ai_" + Date.now(), name: aiComplaintText.trim(), category: "General", source: "ai", clinicalContent: "", commonDifferentials: [], redFlagKeywords: [], tags: [] },
                 age, sex, aiOnly: true, opdMode: consultMode === "opd"
               })}
-              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff" }}>
+              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#8B5CF6" : "#3A3A6A", color: "#fff" }}>
               {!hasKey ? "⚠ Add API Key First" : "✨ Start AI Consultation →"}
             </Btn>
           ) : (
@@ -2487,7 +2491,7 @@ Rules:
         <Badge color={TEAL}>{age} · {sex}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>{complaint.name}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>Q{history.length + 1}</Badge>
-        {aiOnly && <Badge color={{ bg: "#1E1E2E", text: "#A5A5FF", border: "#5B5BDB" }}>✨ AI Mode</Badge>}
+        {aiOnly && <Badge color={{ bg: "#4c1d95", text: "#F3E8FF", border: "#A855F7" }}>✨ AI Mode</Badge>}
         {retrieveMs && <span style={{ fontSize: 11, color: TEAL.primary, fontWeight: 600 }}>⚡ {retrieveMs}ms</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <Btn small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
@@ -2841,7 +2845,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(3, 1fr)" }}>
+            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
               {/* Card 1: ClinicFlow */}
               <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
                 <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
@@ -2895,6 +2899,25 @@ export default function App() {
                   </p>
                   <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
                     Open SuperMemory →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 4: MoProPrep — external gamified learning platform */}
+              <Card onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
+                <div style={{ background: "#ecfeff", borderBottom: "1px solid rgba(8, 145, 178, 0.1)" }}>
+                  <CardCarousel accent="#0891b2" slides={[IllustGame]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎮</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0891b2", margin: 0 }}>MoProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Learn medicine the fun way — a gamified prep platform with quizzes, streaks, and challenges. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
+                    Play & Learn ↗
                   </button>
                 </div>
               </Card>
