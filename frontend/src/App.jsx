@@ -3,23 +3,15 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
-
-// ─── Responsive helper ────────────────────────────────────────────────────────
-function useIsMobile(breakpoint = 480) {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= breakpoint);
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth <= breakpoint);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [breakpoint]);
-  return isMobile;
-}
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const TEAL  = { primary: "#0F6E56", light: "#1D9E75", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
-const AMBER = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#633806" };
-const RED   = { primary: "#E24B4A", bg: "#FCEBEB", border: "#F7C1C1", text: "#791F1F" };
-const GRAY  = { dot: "#888780", bg: "#F1EFE8", text: "#444441" };
+const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
+const AMBER = { primary: "#d97706", bg: "#fef3c7", border: "#fde68a", text: "#78350f" };
+const RED   = { primary: "#e11d48", bg: "#fff1f2", border: "#fecdd3", text: "#9f1239" };
+const GRAY  = { dot: "#6b7280", bg: "#f3f4f6", text: "#1f2937" };
+
+const PURPLE = { primary: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", text: "#5b21b6" };
 
 const LIKELIHOOD_COLORS = {
   high:   { dot: TEAL.light,    text: TEAL.text,   bg: TEAL.bg,   border: TEAL.border },
@@ -34,7 +26,7 @@ function apiKeyFor(provider) { return localStorage.getItem(`clinicalmind:apikey:
 function saveApiKey(provider, key) { localStorage.setItem(`clinicalmind:apikey:${provider}`, key); }
 
 // ─── Shared components ────────────────────────────────────────────────────────
-function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {}, testId, ...rest }) {
+function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {} }) {
   const base = {
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
     borderRadius: 8, fontFamily: "var(--font-sans)", cursor: disabled ? "not-allowed" : "pointer",
@@ -47,7 +39,7 @@ function Btn({ children, onClick, variant = "primary", disabled, small, style: s
     ghost:     { background: "transparent", color: "var(--color-text-secondary)", border: `1.5px solid var(--color-border-primary)` },
     danger:    { background: RED.primary, color: "#fff" },
   };
-  return <button data-testid={testId} style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled} {...rest}>{children}</button>;
+  return <button style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
 function Badge({ children, color = TEAL }) {
@@ -212,7 +204,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Settings</h2>
-          <button data-testid="settings-close-btn" onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Provider selector */}
@@ -220,7 +212,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>AI Provider</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {PROVIDERS.map(pr => (
-              <button key={pr.id} data-testid={`settings-provider-${pr.id}-btn`} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
+              <button key={pr.id} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-sans)",
                   border: `1.5px solid ${provider === pr.id ? TEAL.primary : "var(--color-border-primary)"}`,
                   background: provider === pr.id ? TEAL.bg : "#fff", color: provider === pr.id ? TEAL.primary : "var(--color-text-primary)" }}>
@@ -237,19 +229,19 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
             API Key — {p.name}
           </label>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input data-testid="settings-api-key-input" type={showKey ? "text" : "password"} value={draft} onChange={e => setDraft(e.target.value)}
+            <input type={showKey ? "text" : "password"} value={draft} onChange={e => setDraft(e.target.value)}
               placeholder={p.keyHint}
               style={{ ...inputS, flex: 1, border: `1.5px solid ${draft && !valid ? RED.border : "var(--color-border-primary)"}` }} />
-            <button data-testid="settings-show-hide-key-btn" onClick={() => setShowKey(v => !v)}
+            <button onClick={() => setShowKey(v => !v)}
               style={{ padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff", fontFamily: "var(--font-sans)" }}>
               {showKey ? "Hide" : "Show"}
             </button>
           </div>
-          {draft && !valid && <p data-testid="settings-key-invalid-msg" style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
-          {saved && <p data-testid="settings-key-saved-msg" style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
-          <Btn testId="settings-save-key-btn" onClick={save} disabled={!valid} small>Save Key</Btn>
+          {draft && !valid && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
+          {saved && <p style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
+          <Btn onClick={save} disabled={!valid} small>Save Key</Btn>
           {draft && apiKeyFor(provider) && (
-            <button data-testid="settings-remove-key-btn" onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
+            <button onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
               style={{ marginLeft: 10, fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
               Remove key
             </button>
@@ -263,7 +255,6 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Generic Mode Instructions</label>
             <textarea
-              data-testid="settings-generic-instructions-textarea"
               value={genericInst}
               onChange={e => setGenericInst(e.target.value)}
               rows={8}
@@ -274,7 +265,6 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Detailed Mode Instructions</label>
             <textarea
-              data-testid="settings-detailed-instructions-textarea"
               value={detailedInst}
               onChange={e => setDetailedInst(e.target.value)}
               rows={8}
@@ -283,9 +273,8 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Btn testId="settings-save-instructions-btn" onClick={saveInstructions} small>Save Instructions</Btn>
+            <Btn onClick={saveInstructions} small>Save Instructions</Btn>
             <button
-              data-testid="settings-reset-instructions-btn"
               onClick={() => {
                 if (window.confirm("Are you sure you want to reset instructions to default?")) {
                   localStorage.removeItem("clinicalmind:instructions:generic");
@@ -311,8 +300,8 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
 
         <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-            <strong>ClinicalMind</strong><br />
-            Built for junior doctors in Indian government hospitals.<br /><br />
+            <strong>ClinicFlow</strong><br />
+            Built for doctors in Indian OPDs.<br /><br />
             All processing is local. Your patient data never leaves your device.
           </p>
         </div>
@@ -361,10 +350,10 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
       <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>NODES</span>
-          <button data-testid="workflow-add-node-btn" onClick={addNode} style={{ fontSize: 12, fontWeight: 700, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>+ Add</button>
+          <button onClick={addNode} style={{ fontSize: 12, fontWeight: 700, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>+ Add</button>
         </div>
         {nodes.map(n => (
-          <div key={n.id} data-testid={`workflow-node-${n.id}-item`} onClick={() => setSelectedId(n.id)}
+          <div key={n.id} onClick={() => setSelectedId(n.id)}
             style={{ padding: "8px 10px", borderRadius: 8, cursor: "pointer", border: `1.5px solid ${selectedId === n.id ? TEAL.primary : "var(--color-border-primary)"}`,
               background: selectedId === n.id ? TEAL.bg : "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
@@ -385,7 +374,7 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>NODE ID</label>
-                <input data-testid="workflow-node-id-input" style={{ ...iS, fontFamily: "var(--font-mono)", width: 140 }} value={selected.id}
+                <input style={{ ...iS, fontFamily: "var(--font-mono)", width: 140 }} value={selected.id}
                   onChange={e => {
                     const newId = e.target.value.replace(/\s/g, "_");
                     // Update all references to this id in other nodes' options
@@ -400,12 +389,12 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "flex-end", paddingBottom: 1 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
-                  <input data-testid="workflow-entry-node-checkbox" type="checkbox" checked={entryNode === selected.id}
+                  <input type="checkbox" checked={entryNode === selected.id}
                     onChange={() => onChange({ nodes, entryNode: selected.id })}
                     style={{ marginRight: 4 }} />
                   Entry node
                 </label>
-                <button data-testid="workflow-delete-node-btn" onClick={() => removeNode(selected.id)}
+                <button onClick={() => removeNode(selected.id)}
                   style={{ fontSize: 12, color: RED.primary, background: RED.bg, border: `1px solid ${RED.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                   Delete node
                 </button>
@@ -414,14 +403,14 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
 
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>QUESTION</label>
-              <textarea data-testid="workflow-question-textarea" style={{ ...iS, minHeight: 60, resize: "vertical" }} value={selected.question}
+              <textarea style={{ ...iS, minHeight: 60, resize: "vertical" }} value={selected.question}
                 onChange={e => updateNode(selected.id, { question: e.target.value })} />
             </div>
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)" }}>OPTIONS ({selected.options.length})</label>
-                <button data-testid="workflow-add-option-btn" onClick={() => addOption(selected.id)}
+                <button onClick={() => addOption(selected.id)}
                   style={{ fontSize: 12, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                   + Option
                 </button>
@@ -430,15 +419,15 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
                 {selected.options.map((opt, i) => (
                   <div key={i} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <input data-testid={`workflow-option-${i}-label-input`} style={{ ...iS, flex: 1 }} value={opt.label} placeholder="Option label"
+                      <input style={{ ...iS, flex: 1 }} value={opt.label} placeholder="Option label"
                         onChange={e => updateOption(selected.id, i, { label: e.target.value })} />
-                      <button data-testid={`workflow-option-${i}-remove-btn`} onClick={() => removeOption(selected.id, i)}
+                      <button onClick={() => removeOption(selected.id, i)}
                         style={{ fontSize: 14, color: RED.primary, background: "none", border: "none", cursor: "pointer", padding: "0 4px", flexShrink: 0 }}>✕</button>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>NEXT NODE</label>
-                        <select data-testid={`workflow-option-${i}-next-select`} style={{ ...iS, borderColor: opt.next === "END" && nodes.length > 1 ? AMBER.border : undefined }} value={opt.next}
+                        <select style={{ ...iS, borderColor: opt.next === "END" && nodes.length > 1 ? AMBER.border : undefined }} value={opt.next}
                           onChange={e => updateOption(selected.id, i, { next: e.target.value })}>
                           <option value="END">END (finish consultation)</option>
                           <option value="AI">AI (call AI for next Q)</option>
@@ -450,19 +439,19 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
                       </div>
                       <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>TAGS (comma-sep)</label>
-                        <input data-testid={`workflow-option-${i}-tags-input`} style={iS} value={(opt.tags || []).join(", ")} placeholder="e.g. rigors, chills"
+                        <input style={iS} value={(opt.tags || []).join(", ")} placeholder="e.g. rigors, chills"
                           onChange={e => updateOption(selected.id, i, { tags: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <label style={{ fontSize: 11, fontWeight: 600, color: RED.text, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                        <input data-testid={`workflow-option-${i}-redflag-checkbox`} type="checkbox" checked={!!opt.redFlag}
+                        <input type="checkbox" checked={!!opt.redFlag}
                           onChange={e => updateOption(selected.id, i, { redFlag: e.target.checked })} />
                         🚨 Red flag
                       </label>
                     </div>
                     {opt.redFlag && (
-                      <input data-testid={`workflow-option-${i}-redflag-message-input`} style={{ ...iS, fontSize: 12, borderColor: RED.border }} value={opt.redFlagMessage || ""}
+                      <input style={{ ...iS, fontSize: 12, borderColor: RED.border }} value={opt.redFlagMessage || ""}
                         placeholder="Red flag message shown to doctor…"
                         onChange={e => updateOption(selected.id, i, { redFlagMessage: e.target.value })} />
                     )}
@@ -540,7 +529,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{complaint ? `Edit: ${complaint.name}` : "Create New Complaint"}</h2>
-          <button data-testid="complaint-editor-close-btn" onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
         </div>
 
         {complaint?.source === "system" && (
@@ -558,7 +547,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1.5px solid var(--color-border-primary)", paddingBottom: 0 }}>
           {TABS.map(t => (
-            <button key={t.id} data-testid={`complaint-editor-tab-${t.id}-btn`} onClick={() => setTab(t.id)}
+            <button key={t.id} onClick={() => setTab(t.id)}
               style={{ padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", fontFamily: "var(--font-sans)",
                 borderBottom: tab === t.id ? `2.5px solid ${TEAL.primary}` : "2.5px solid transparent",
                 background: "none", color: tab === t.id ? TEAL.primary : "var(--color-text-secondary)", marginBottom: -1.5 }}>
@@ -572,33 +561,33 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Complaint Name</label>
-              <input data-testid="complaint-editor-name-input" style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Fever with Cough" />
+              <input style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Fever with Cough" />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Category</label>
-                <select data-testid="complaint-editor-category-select" style={inputS} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                <select style={inputS} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
                   {CATEGORIES.slice(1).map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Age Group</label>
-                <select data-testid="complaint-editor-age-group-select" style={inputS} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
+                <select style={inputS} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
                   {["all","pediatric","neonatal","adult"].map(a => <option key={a}>{a}</option>)}
                 </select>
               </div>
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Red Flag Keywords <span style={{ fontWeight: 400, fontSize: 12 }}>(comma-separated — triggers alert if patient mentions these)</span></label>
-              <input data-testid="complaint-editor-redflags-input" style={inputS} value={rfInput} onChange={e => setRfInput(e.target.value)} placeholder="e.g. petechiae, neck stiff, cyanosis" />
+              <input style={inputS} value={rfInput} onChange={e => setRfInput(e.target.value)} placeholder="e.g. petechiae, neck stiff, cyanosis" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Common Differentials <span style={{ fontWeight: 400, fontSize: 12 }}>(comma-separated — shown in sidebar)</span></label>
-              <input data-testid="complaint-editor-differentials-input" style={inputS} value={diffInput} onChange={e => setDiffInput(e.target.value)} placeholder="e.g. Malaria, Dengue, Typhoid" />
+              <input style={inputS} value={diffInput} onChange={e => setDiffInput(e.target.value)} placeholder="e.g. Malaria, Dengue, Typhoid" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Tags</label>
-              <input data-testid="complaint-editor-tags-input" style={inputS} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="e.g. fever, rash" />
+              <input style={inputS} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="e.g. fever, rash" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
@@ -611,7 +600,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   {tagLibrary.map(t => {
                     const on = tagRefs.includes(t.id);
                     return (
-                      <button key={t.id} type="button" data-testid={`complaint-editor-tagref-${t.id}-toggle`}
+                      <button key={t.id} type="button"
                         onClick={() => setTagRefs(prev => on ? prev.filter(id => id !== t.id) : [...prev, t.id])}
                         style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontFamily: "var(--font-sans)",
                           border: `1.5px solid ${on ? TEAL.primary : "var(--color-border-primary)"}`,
@@ -630,7 +619,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                 <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <div style={{ flex: 1, minWidth: 110 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>NEW TAG LABEL</label>
-                    <input data-testid="complaint-editor-new-tag-label-input" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagLabel} onChange={e => setNewTagLabel(e.target.value)}
+                    <input style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagLabel} onChange={e => setNewTagLabel(e.target.value)}
                       placeholder="e.g. Fever" list="complaint-editor-tag-labels" />
                     <datalist id="complaint-editor-tag-labels">
                       {tagLibrary.map(t => <option key={t.id} value={t.label} />)}
@@ -638,15 +627,15 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   </div>
                   <div style={{ minWidth: 140 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>PDF</label>
-                    <select data-testid="complaint-editor-new-tag-doc-select" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagDoc} onChange={e => setNewTagDoc(e.target.value)}>
+                    <select style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagDoc} onChange={e => setNewTagDoc(e.target.value)}>
                       {pdfDocs.filter(d => d.isPdf).map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
                     </select>
                   </div>
                   <div style={{ width: 70 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>PAGE</label>
-                    <input data-testid="complaint-editor-new-tag-page-input" type="number" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagPage} onChange={e => setNewTagPage(e.target.value)} min={1} />
+                    <input type="number" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagPage} onChange={e => setNewTagPage(e.target.value)} min={1} />
                   </div>
-                  <button data-testid="complaint-editor-new-tag-add-btn" type="button" onClick={createInlineTag} disabled={newTagBusy || !newTagLabel.trim() || !newTagPage}
+                  <button type="button" onClick={createInlineTag} disabled={newTagBusy || !newTagLabel.trim() || !newTagPage}
                     style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: newTagBusy ? "default" : "pointer", border: "none",
                       background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)", opacity: (!newTagLabel.trim() || !newTagPage) ? 0.5 : 1 }}>
                     {newTagBusy ? "Adding…" : "+ Add Tag"}
@@ -667,7 +656,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
                 <p style={{ fontSize: 32, marginBottom: 10 }}>🌳</p>
                 <p style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 16 }}>No workflow yet. Add your first question node to get started.</p>
-                <Btn testId="complaint-editor-create-first-node-btn" onClick={() => {
+                <Btn onClick={() => {
                   const id = "q1";
                   setWorkflow({ nodes: [{ id, question: "First question?", options: [{ label: "Yes", next: "END", tags: [] }, { label: "No", next: "END", tags: [] }] }], entryNode: id });
                 }}>+ Create First Node</Btn>
@@ -693,12 +682,12 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: TEAL.text, display: "block", marginBottom: 4 }}>↑ INCREASE TAGS (comma-sep)</label>
-                      <input data-testid={`weights-${diag}-increase-input`} style={inputS} value={(w.tags_increase || []).join(", ")} placeholder="e.g. rigors, chills"
+                      <input style={inputS} value={(w.tags_increase || []).join(", ")} placeholder="e.g. rigors, chills"
                         onChange={e => setDiffWeights(dw => ({ ...dw, [diag]: { ...w, tags_increase: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: RED.text, display: "block", marginBottom: 4 }}>↓ DECREASE TAGS (comma-sep)</label>
-                      <input data-testid={`weights-${diag}-decrease-input`} style={inputS} value={(w.tags_decrease || []).join(", ")} placeholder="e.g. rash, bleeding"
+                      <input style={inputS} value={(w.tags_decrease || []).join(", ")} placeholder="e.g. rash, bleeding"
                         onChange={e => setDiffWeights(dw => ({ ...dw, [diag]: { ...w, tags_decrease: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))} />
                     </div>
                   </div>
@@ -717,7 +706,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
               Clinical Reference Content <span style={{ fontWeight: 400, fontSize: 12 }}>(BM25-indexed — used as AI context and for the diagnosis sidebar)</span>
             </label>
-            <textarea data-testid="complaint-editor-content-textarea" style={{ ...inputS, minHeight: 320, resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7 }}
+            <textarea className="premium-textarea" style={{ minHeight: 320, resize: "vertical" }}
               value={form.clinicalContent}
               onChange={e => setForm(f => ({ ...f, clinicalContent: e.target.value }))}
               placeholder="Paste clinical reference text here — differentials, red flags, investigations, treatment. Plain text is fine." />
@@ -726,24 +715,25 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
 
         {/* Footer */}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--color-border-primary)", flexWrap: "wrap" }}>
-          <Btn testId="complaint-editor-cancel-btn" variant="ghost" onClick={onClose} small>Cancel</Btn>
-          <Btn testId="complaint-editor-export-json-btn" variant="secondary" small onClick={() => {
+          <Btn variant="ghost" onClick={onClose} small>Cancel</Btn>
+          <Btn variant="secondary" small onClick={() => {
             const data = { ...form, redFlagKeywords: rfInput.split(",").map(s => s.trim()).filter(Boolean), workflow };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
             const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${form.name || "complaint"}.json`; a.click();
           }}>Export JSON</Btn>
-          <Btn testId="complaint-editor-save-btn" onClick={save} disabled={!form.name}>Save as Private</Btn>
+          <Btn onClick={save} disabled={!form.name}>Save as Private</Btn>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Document Vault ───────────────────────────────────────────────────────────
+// ─── SuperMemory (collapsed Document Vault) ──────────────────────────────────
 function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pdfBuffers, onOpenReader, onOpenTagLibrary }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(null);
   const [parsing, setParsing] = useState(null);
+  const [expanded, setExpanded] = useState(false);
   const fileRef = useRef();
 
   const processFile = async (file) => {
@@ -788,27 +778,70 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
       .filter(t => t.sources.length > 0));
   };
 
+  const totalDocs = pdfDocs.length;
+  const totalTags = tagLibrary.length;
+
+  if (!expanded) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 2 }}>
+          <CardCarousel accent={PURPLE.primary} height={110} slides={[IllustLibrary, IllustDocs]} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
+          <span style={{ fontSize: 10, background: PURPLE.bg, color: PURPLE.primary, padding: "2px 8px", borderRadius: 10, fontWeight: 700 }}>AI INDEXED</span>
+        </div>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.45 }}>
+          Forgotten asthma algorithm in OPD? Not anymore. Create your custom tags from your books and just review your custom tags.
+        </p>
+        <p style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-primary)", margin: 0 }}>
+          📄 {totalDocs} book{totalDocs !== 1 ? "s" : ""} uploaded · 🏷️ {totalTags} custom tag{totalTags !== 1 ? "s" : ""}
+        </p>
+        <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          <button 
+            onClick={() => setExpanded(true)}
+            style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${PURPLE.border}`, background: PURPLE.bg, color: PURPLE.primary, cursor: "pointer", fontFamily: "var(--font-sans)" }}
+          >
+            📥 Manage Books & Tags
+          </button>
+          {totalTags > 0 && (
+            <button 
+              onClick={onOpenTagLibrary}
+              style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)" }}
+            >
+              📚 View Tag Library
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Document Vault</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
+        <button onClick={() => setExpanded(false)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>Collapse ✕</button>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>Manage your medical books and protocol library</p>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {tagLibrary.length > 0 && (
-            <button data-testid="document-vault-tag-library-btn" onClick={onOpenTagLibrary} style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, background: "none", border: "none", cursor: "pointer" }}>📚 Tag Library ({tagLibrary.length})</button>
+            <button onClick={onOpenTagLibrary} style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, background: "none", border: "none", cursor: "pointer" }}>📚 Tag Library ({tagLibrary.length})</button>
           )}
           {pdfDocs.length > 0 && (
-            <button data-testid="document-vault-clear-all-btn" onClick={() => { setPdfDocs([]); setTagLibrary([]); pdfBuffers.current.clear(); idx.clear(); }}
+            <button onClick={() => { setPdfDocs([]); setTagLibrary([]); pdfBuffers.current.clear(); idx.clear(); }}
               style={{ fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer" }}>Clear all</button>
           )}
         </div>
       </div>
-      <div data-testid="document-vault-dropzone" onDrop={e => { e.preventDefault(); setDragging(false); Array.from(e.dataTransfer.files).forEach(processFile); }}
+      <div onDrop={e => { e.preventDefault(); setDragging(false); Array.from(e.dataTransfer.files).forEach(processFile); }}
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onClick={() => fileRef.current?.click()}
         style={{ border: `2px dashed ${dragging ? TEAL.primary : "var(--color-border-secondary)"}`, borderRadius: 10,
           padding: "20px 16px", textAlign: "center", cursor: "pointer",
           background: dragging ? TEAL.bg : "var(--color-background-secondary)", transition: "all 0.15s" }}>
-        <input data-testid="document-vault-file-input" ref={fileRef} type="file" multiple accept=".txt,.md,.pdf" style={{ display: "none" }}
+        <input ref={fileRef} type="file" multiple accept=".txt,.md,.pdf" style={{ display: "none" }}
           onChange={e => { Array.from(e.target.files).forEach(processFile); e.target.value = ""; }} />
         {loading ? <p style={{ fontSize: 13, color: TEAL.primary, margin: 0 }}>Loading {loading}…</p> : (
           <>
@@ -819,7 +852,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
         )}
       </div>
       {pdfDocs.map((doc, i) => (
-        <div key={i} data-testid={`document-vault-doc-${i}-item`} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div key={i} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</p>
@@ -828,18 +861,18 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
                 {doc.parsed && <span style={{ marginLeft: 6, color: TEAL.primary, fontWeight: 600 }}>· {doc.chunks} chunks indexed</span>}
               </p>
             </div>
-            <button data-testid={`document-vault-doc-${i}-remove-btn`} onClick={() => removeDoc(doc.name)}
+            <button onClick={() => removeDoc(doc.name)}
               style={{ fontSize: 14, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 8 }}>✕</button>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {doc.isPdf && (
-              <button data-testid={`document-vault-doc-${i}-open-reader-btn`} onClick={() => onOpenReader(doc)}
+              <button onClick={() => onOpenReader(doc)}
                 style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                 📖 Open Reader
               </button>
             )}
             {doc.isPdf && !doc.parsed && (
-              <button data-testid={`document-vault-doc-${i}-parse-btn`} onClick={() => parseDoc(doc)} disabled={parsing === doc.name}
+              <button onClick={() => parseDoc(doc)} disabled={parsing === doc.name}
                 style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)", opacity: parsing === doc.name ? 0.6 : 1 }}>
                 {parsing === doc.name ? "Parsing…" : "🔍 Parse for BM25 search"}
               </button>
@@ -850,7 +883,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingTop: 2 }}>
               {tagLibrary.flatMap(t =>
                 t.sources.filter(s => s.docName === doc.name).map(s => (
-                  <button key={`${t.id}-${s.page}`} data-testid={`document-vault-tag-${t.id}-p${s.page}-btn`} onClick={() => onOpenReader(doc, s.page)}
+                  <button key={`${t.id}-${s.page}`} onClick={() => onOpenReader(doc, s.page)}
                     style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6, border: "1.5px solid #B3D4F5", background: "#E8F4FF", color: "#1A5C9A", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                     📖 {t.label} p.{s.page}
                   </button>
@@ -869,13 +902,13 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
   const [hov, setHov] = useState(false);
   const hasWorkflow = !!complaint.workflow;
   return (
-    <div data-testid={`complaint-card-${complaint.id}`} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: selected ? TEAL.bg : "#fff", border: `1.5px solid ${selected ? TEAL.primary : hov ? TEAL.border : "var(--color-border-primary)"}`,
         borderRadius: 10, padding: 12, transition: "all 0.15s", cursor: "pointer" }}
       onClick={onSelect}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: hasWorkflow ? TEAL.primary : AMBER.primary, flexShrink: 0, marginTop: 4 }} />
-        <button data-testid={`complaint-card-${complaint.id}-edit-btn`} onClick={e => { e.stopPropagation(); onEdit(); }}
+        <button onClick={e => { e.stopPropagation(); onEdit(); }}
           style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>✏️</button>
       </div>
       <p style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-primary)", margin: "0 0 6px", lineHeight: 1.4 }}>{complaint.name}</p>
@@ -887,7 +920,14 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
 function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onModeChange }) {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
-  const [tab, setTab] = useState("System");
+  const [tab, setTab] = useState("AI");
+  
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleTab = (t) => {
     setTab(t);
@@ -904,29 +944,26 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
     return matchCat && matchSearch;
   });
 
-  const TAB_COLORS = {
-    AI: { active: { bg: "#1E1E2E", border: "#5B5BDB", color: "#A5A5FF" }, inactive: {} }
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Complaint Library</h3>
-        {tab !== "AI" && <Btn testId="complaint-library-new-btn" small onClick={() => onEdit(null)}>+ New</Btn>}
+        <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: TEAL.primary }}>Complaint Library</h3>
+        {tab !== "AI" && <Btn small onClick={() => onEdit(null)}>+ New</Btn>}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["System","Private","Community","AI"].map(t => (
-          <button key={t} data-testid={`complaint-library-tab-${t.toLowerCase()}-btn`} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-            borderColor: tab === t ? (t === "AI" ? "#5B5BDB" : TEAL.primary) : "var(--color-border-primary)",
-            background: tab === t ? (t === "AI" ? "#1E1E2E" : TEAL.bg) : "#fff",
-            color: tab === t ? (t === "AI" ? "#A5A5FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
+          <button key={t} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+            borderColor: tab === t ? (t === "AI" ? "#A855F7" : TEAL.primary) : "var(--color-border-primary)",
+            background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : TEAL.bg) : "#fff",
+            boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
+            color: tab === t ? (t === "AI" ? "#F3E8FF" : TEAL.primary) : "var(--color-text-secondary)" }}>
             {t === "AI" ? "✨ AI Mode" : t}
           </button>
         ))}
       </div>
 
       {tab === "AI" ? (
-        <div style={{ background: "linear-gradient(135deg,#1E1E2E,#2A1A4E)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ background: "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <span style={{ fontSize: 28 }}>✨</span>
             <div>
@@ -945,13 +982,58 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
           </div>
           <p style={{ fontSize: 11, color: "#5050A0", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>
         </div>
+      ) : isMobile ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>📁 Select System / Category</label>
+            <input 
+              value={cat === "All" ? "" : cat} 
+              onChange={e => setCat(e.target.value.trim() ? e.target.value : "All")}
+              placeholder="Type to search system (e.g. GI, Neuro)..."
+              list="mobile-categories-list"
+              style={{ padding: "10px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, fontFamily: "var(--font-sans)", width: "100%", outline: "none" }}
+            />
+            <datalist id="mobile-categories-list">
+              {CATEGORIES.map(c => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>🩺 Search & Select Complaint</label>
+            <input 
+              value={search} 
+              onChange={e => {
+                const val = e.target.value;
+                setSearch(val);
+                const matched = source.find(c => c.name.toLowerCase() === val.toLowerCase());
+                if (matched) setSelected(matched);
+              }}
+              placeholder="Type to search & select complaint..."
+              list="mobile-complaints-list"
+              style={{ padding: "10px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, fontFamily: "var(--font-sans)", width: "100%", outline: "none" }}
+            />
+            <datalist id="mobile-complaints-list">
+              {filtered.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+          </div>
+
+          {selected && (
+            <div style={{ background: TEAL.bg, border: `1.5px solid ${TEAL.border}`, borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fadeSlideIn 0.2s ease" }}>
+              <div>
+                <span style={{ fontSize: 10, fontWeight: 800, color: TEAL.primary }}>SELECTED COMPLAINT</span>
+                <p style={{ fontSize: 14, fontWeight: 700, margin: "2px 0 0", color: TEAL.text }}>{selected.name}</p>
+              </div>
+              <span style={{ fontSize: 18 }}>✅</span>
+            </div>
+          )}
+        </div>
       ) : (
         <>
-          <input data-testid="complaint-library-search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search complaints…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search complaints…"
             style={{ padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {CATEGORIES.map(c => (
-              <button key={c} data-testid={`complaint-library-category-${c.toLowerCase()}-chip`} onClick={() => setCat(c)} style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+              <button key={c} onClick={() => setCat(c)} style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                 borderColor: cat === c ? TEAL.primary : "var(--color-border-primary)", background: cat === c ? TEAL.primary : "#fff", color: cat === c ? "#fff" : "var(--color-text-secondary)" }}>
                 {c}
               </button>
@@ -970,16 +1052,17 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
   );
 }
 
-// ─── Product Toggle: ClinicalMind ⇄ SuperSummary ──────────────────────────────
+// ─── Product Toggle: ClinicFlow ⇄ SuperSummary ──────────────────────────────
 function ProductToggle({ product, setProduct }) {
   const opts = [
-    { id: "clinicalmind", label: "ClinicalMind", color: TEAL.primary, bg: TEAL.bg },
-    { id: "supersummary", label: "SuperSummary", color: "#6E40C9", bg: "#F3EEFF" },
+    { id: null, label: "🏠 Home", color: "var(--color-text-primary)", bg: "var(--color-border-primary)" },
+    { id: "clinicalmind", label: "ClinicFlow", color: TEAL.primary, bg: TEAL.bg },
+    { id: "supersummary", label: "SuperSummary", color: PURPLE.primary, bg: PURPLE.bg },
   ];
   return (
     <div style={{ display: "flex", gap: 3, background: "var(--color-background-secondary)", borderRadius: 20, padding: 3 }}>
       {opts.map(o => (
-        <button key={o.id} data-testid={`product-toggle-${o.id}-btn`} onClick={() => setProduct(o.id)}
+        <button key={o.id} onClick={() => setProduct(o.id)}
           style={{ padding: "6px 14px", borderRadius: 18, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "none", fontFamily: "var(--font-sans)",
             background: product === o.id ? o.bg : "transparent", color: product === o.id ? o.color : "var(--color-text-secondary)" }}>
           {o.label}
@@ -989,9 +1072,46 @@ function ProductToggle({ product, setProduct }) {
   );
 }
 
+// ─── Profile Modal ────────────────────────────────────────────────────────────
+function ProfileModal({ onClose, onSettings }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
+        <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
+          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+        </div>
+        <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
+          <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", padding: 18, textAlign: "center" }}>
+            <p style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>Attending Doctor</p>
+            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>Indian Government Hospital OPD</p>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div style={{ flex: 1, background: TEAL.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🔒</p>
+              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>On-device only</p>
+            </div>
+            <div style={{ flex: 1, background: PURPLE.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+              <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>⚡</p>
+              <p style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>v1.0 ClinicFlow</p>
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
+            No account needed — your patient data and API keys never leave this device.
+          </p>
+          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ⚙️ Open Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Profile Menu ─────────────────────────────────────────────────────────────
 function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   const [open, setOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const ref = useRef();
 
   useEffect(() => {
@@ -1007,24 +1127,29 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button data-testid="profile-menu-avatar-btn" onClick={() => setOpen(v => !v)}
-        style={{ width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${TEAL.border}`, background: TEAL.bg,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, cursor: "pointer" }}>
+      <button onClick={() => setOpen(v => !v)}
+        style={{ width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
+          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
         🧑‍⚕️
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", borderRadius: 12,
-          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 190, overflow: "hidden", zIndex: 60 }}>
-          <button data-testid="profile-menu-tag-library-item" onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
+          border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 200, overflow: "hidden", zIndex: 60 }}>
+          <button onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
+            <span>👤 View Profile</span>
+          </button>
+          <div style={{ height: 1, background: "var(--color-border-primary)" }} />
+          <button onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
             <span>📚 Tag Library</span>
             {tagCount > 0 && <span style={{ fontSize: 11, background: TEAL.bg, color: TEAL.primary, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{tagCount}</span>}
           </button>
           <div style={{ height: 1, background: "var(--color-border-primary)" }} />
-          <button data-testid="profile-menu-settings-item" onClick={() => { setOpen(false); onSettings(); }} style={itemS}>
+          <button onClick={() => { setOpen(false); onSettings(); }} style={itemS}>
             <span>⚙️ Settings</span>
           </button>
         </div>
       )}
+      {showProfile && <ProfileModal onClose={() => setShowProfile(false)} onSettings={onSettings} />}
     </div>
   );
 }
@@ -1038,12 +1163,12 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
   const [sex, setSex] = useState("");
   const [editing, setEditing] = useState(undefined);
   const [editingNoAiNotice, setEditingNoAiNotice] = useState(false);
-  const [isAiMode, setIsAiMode] = useState(false);
+  const [isAiMode, setIsAiMode] = useState(true);
   const [aiComplaintText, setAiComplaintText] = useState("");
   const [readerState, setReaderState] = useState(null); // { doc, initPage }
   const [creatingFromPdf, setCreatingFromPdf] = useState(false);
   const [tagLibraryOpen, setTagLibraryOpen] = useState(false);
-  const isMobile = useIsMobile();
+  const [consultMode, setConsultMode] = useState("learning");
 
   const addTagSource = (label, docName, page, extractedText, image) => {
     const norm = label.trim().toLowerCase();
@@ -1118,16 +1243,16 @@ Return ONLY valid JSON with this exact structure:
   };
 
   return (
-    <div data-testid="library-screen" style={{ minHeight: "100vh" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+    <div style={{ minHeight: "100vh" }}>
+      <div className="hero-band" style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🩺</span>
           <div>
-            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: TEAL.primary }}>ClinicalMind</h1>
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>India Government Hospital OPD</p>
+            <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>ClinicFlow</h1>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Indian OPD</p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <ProductToggle product={product} setProduct={setProduct} />
           <ProfileMenu
             onSettings={() => setSettingsOpen(true)}
@@ -1148,30 +1273,30 @@ Return ONLY valid JSON with this exact structure:
             ) : (
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>
                 <strong style={{ color: "var(--color-text-primary)" }}>Offline mode.</strong> All 10 complaints run fully without an API key — structured local workflow + offline note.{" "}
-                <button data-testid="library-add-api-key-link" onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
+                <button onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
               </p>
             )}
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 20, marginBottom: 20 }}>
+        <div className="library-grid">
           <Card><DocumentVault pdfDocs={pdfDocs} setPdfDocs={setPdfDocs} idx={idx} tagLibrary={tagLibrary} setTagLibrary={setTagLibrary} pdfBuffers={pdfBuffers}
             onOpenReader={(doc, initPage) => setReaderState({ doc, initPage: initPage || 1 })}
             onOpenTagLibrary={() => setTagLibraryOpen(true)} /></Card>
           <Card><ComplaintLibrary selected={selected} setSelected={setSelected} onEdit={openEdit} customComplaints={customComplaints} onModeChange={setIsAiMode} /></Card>
         </div>
 
-        <Card style={{ display: "flex", gap: 16, alignItems: "flex-end", flexWrap: "wrap",
-          background: isAiMode ? "linear-gradient(135deg,#1E1E2E,#2A1A4E)" : "#fff",
-          border: isAiMode ? "1.5px solid #5B5BDB" : "1.5px solid var(--color-border-primary)" }}>
+        <Card className="start-card" style={{
+          background: isAiMode ? "linear-gradient(135deg,#1e1b3a 0%,#3b1d6e 45%,#7c3aed 85%,#a855f7 100%)" : "#fff",
+          border: isAiMode ? "1.5px solid #8B5CF6" : "1.5px solid var(--color-border-primary)" }}>
 
           {/* Complaint selector / AI text input */}
           {isAiMode ? (
             <div style={{ flex: 1, minWidth: 220 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#9090C0", display: "block", marginBottom: 4 }}>Chief Complaint</label>
-              <input data-testid="library-ai-complaint-input" value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
+              <input value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
                 placeholder="e.g. Fever for 3 days, Abdominal pain…"
-                style={{ padding: "9px 12px", border: "1.5px solid #5B5BDB", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
+                style={{ padding: "9px 12px", border: "1.5px solid #8B5CF6", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
             </div>
           ) : selected ? (
             <div style={{ background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 8, padding: "8px 14px" }}>
@@ -1186,11 +1311,11 @@ Return ONLY valid JSON with this exact structure:
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Patient Age</label>
             <div style={{ display: "flex", gap: 6 }}>
-              <input type="number" min={0} data-testid="library-age-input" value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
-                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
+              <input type="number" min={0} value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
+                style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }} />
-              <select data-testid="library-age-unit-select" value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
-                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#5B5BDB" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
+              <select value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
+                style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }}>
                 <option value="years">Years</option>
                 <option value="months">Months</option>
@@ -1204,30 +1329,87 @@ Return ONLY valid JSON with this exact structure:
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Sex</label>
             <div style={{ display: "flex", gap: 6 }}>
               {["Male","Female","Other"].map(s => (
-                <button key={s} data-testid={`library-sex-${s.toLowerCase()}-btn`} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
-                  borderColor: sex === s ? (isAiMode ? "#5B5BDB" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                <button key={s} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+                  borderColor: sex === s ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: sex === s ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
-                  color: sex === s ? (isAiMode ? "#A5A5FF" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
+                  color: sex === s ? (isAiMode ? "#D8B4FE" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
                   {s}
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Consultation Mode Selector */}
+          <div style={{ width: "100%", borderTop: `1px solid ${isAiMode ? "#3A3A6A" : "var(--color-border-primary)"}`, paddingTop: 16, marginTop: 8 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>Consultation Mode</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <div 
+                onClick={() => setConsultMode("learning")}
+                style={{
+                  padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
+                  borderColor: consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  background: consultMode === "learning" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
+                  transition: "all 0.15s"
+                }}
+              >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M4 6 C10 2 18 2 24 6 V30 C18 26 10 26 4 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} opacity="0.85" />
+                  <path d="M44 6 C38 2 30 2 24 6 V30 C30 26 38 26 44 30 Z" fill={consultMode === "learning" ? (isAiMode ? "#8B8BFF" : TEAL.light) : "#cbd5e1"} />
+                  <line x1="24" y1="6" x2="24" y2="30" stroke="#fff" strokeWidth="1.5" opacity="0.6" />
+                </svg>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14 }}>📖</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "learning" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>Learning Mode</span>
+                </div>
+                <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
+                  Follows the standard structured sequential clinical workflow (one question at a time).
+                </p>
+              </div>
+
+              <div 
+                onClick={() => {
+                  if (hasKey) {
+                    setConsultMode("opd");
+                  } else {
+                    alert("OPD Mode requires an API Key. Please add one in settings or use Learning Mode.");
+                  }
+                }}
+                style={{
+                  padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
+                  borderColor: consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
+                  background: consultMode === "opd" ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
+                  opacity: hasKey ? 1 : 0.6,
+                  transition: "all 0.15s"
+                }}
+              >
+                <svg width="34" height="26" viewBox="0 0 48 36" style={{ marginBottom: 6 }}>
+                  <path d="M27 2 L10 20 h9 l-4 14 L33 16 h-9 Z" fill={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.primary) : "#94a3b8"} />
+                  <circle cx="24" cy="18" r="16" fill="none" stroke={consultMode === "opd" ? (isAiMode ? "#8B5CF6" : TEAL.light) : "#cbd5e1"} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
+                </svg>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 14 }}>⚡</span>
+                  <span style={{ fontWeight: 700, fontSize: 13, color: consultMode === "opd" ? (isAiMode ? "#D8B4FE" : TEAL.primary) : "var(--color-text-primary)" }}>OPD Mode</span>
+                </div>
+                <p style={{ fontSize: 11, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", margin: 0, lineHeight: 1.3 }}>
+                  Fast-track mode. AI asks 3–4 questions simultaneously to quickly update differentials.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Start button */}
           {isAiMode ? (
             <Btn
-              testId="library-start-ai-consultation-btn"
               disabled={!aiComplaintText.trim() || !age || !hasKey}
               onClick={() => onStart({
                 complaint: { id: "ai_" + Date.now(), name: aiComplaintText.trim(), category: "General", source: "ai", clinicalContent: "", commonDifferentials: [], redFlagKeywords: [], tags: [] },
-                age, sex, aiOnly: true
+                age, sex, aiOnly: true, opdMode: consultMode === "opd"
               })}
-              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff" }}>
+              style={{ padding: "11px 28px", fontSize: 15, background: hasKey ? "#8B5CF6" : "#3A3A6A", color: "#fff" }}>
               {!hasKey ? "⚠ Add API Key First" : "✨ Start AI Consultation →"}
             </Btn>
           ) : (
-            <Btn testId="library-start-consultation-btn" disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false })} style={{ padding: "11px 28px", fontSize: 15 }}>
+            <Btn disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false, opdMode: consultMode === "opd" })} style={{ padding: "11px 28px", fontSize: 15 }}>
               Start Consultation →
             </Btn>
           )}
@@ -1299,7 +1481,6 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
   const [indexProgress, setIndexProgress] = useState(null); // { done, total } while extracting
   const canvasRef = useRef();
   const pageCache = useRef(new Map()); // page number -> extracted text, built lazily & reused across searches
-  const isMobile = useIsMobile();
 
   // Extract & cache every page's text once, so repeat searches are instant.
   const ensureIndexed = async () => {
@@ -1440,36 +1621,36 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
   return (
     <div style={{ position: "fixed", inset: 0, background: "#0D1117", zIndex: 500, display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
-      <div style={{ background: "#161B22", borderBottom: "1px solid #21262D", padding: "10px 16px", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap", rowGap: 8 }}>
-        <button data-testid="pdf-reader-close-btn" onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "#8B949E", flexShrink: 0 }}>✕</button>
+      <div style={{ background: "#161B22", borderBottom: "1px solid #21262D", padding: "10px 16px", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+        <button onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "#8B949E", flexShrink: 0 }}>✕</button>
         <p style={{ fontSize: 13, fontWeight: 600, color: "#E6EDF3", margin: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>📖 {docName}</p>
 
         {/* Page navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <button data-testid="pdf-reader-first-page-btn" onClick={() => goTo(1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>«</button>
-          <button data-testid="pdf-reader-prev-page-btn" onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>‹</button>
-          <input data-testid="pdf-reader-page-input" type="number" value={currentPage} min={1} max={numPages}
+          <button onClick={() => goTo(1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>«</button>
+          <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>‹</button>
+          <input type="number" value={currentPage} min={1} max={numPages}
             onChange={e => { const v = parseInt(e.target.value); if (v >= 1 && v <= numPages) setCurrentPage(v); }}
             style={{ width: 56, textAlign: "center", padding: "5px 6px", borderRadius: 6, border: "1px solid #30363D", background: "#0D1117", color: "#E6EDF3", fontSize: 13, fontFamily: "var(--font-mono)", outline: "none" }} />
           <span style={{ color: "#6E7681", fontSize: 12 }}>/ {numPages}</span>
-          <button data-testid="pdf-reader-next-page-btn" onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>›</button>
-          <button data-testid="pdf-reader-last-page-btn" onClick={() => goTo(numPages)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>»</button>
+          <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>›</button>
+          <button onClick={() => goTo(numPages)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>»</button>
         </div>
 
         {/* Zoom */}
-        <select data-testid="pdf-reader-zoom-select" value={scale} onChange={e => setScale(Number(e.target.value))}
+        <select value={scale} onChange={e => setScale(Number(e.target.value))}
           style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #30363D", background: "#0D1117", color: "#E6EDF3", fontSize: 12, cursor: "pointer" }}>
           {[0.75, 1, 1.25, 1.5, 1.75, 2].map(s => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
         </select>
 
-        <button data-testid="pdf-reader-tag-toggle-btn" onClick={() => { setShowTagPanel(v => !v); setTagLabel(""); setTagPages(""); }}
+        <button onClick={() => { setShowTagPanel(v => !v); setTagLabel(""); setTagPages(""); }}
           style={{ ...btnS(showTagPanel), borderColor: showTagPanel ? TEAL.border : "#2D3748" }}>
           🏷 Tag
         </button>
         {onOpenTagLibrary && (
-          <button data-testid="pdf-reader-tag-library-btn" onClick={onOpenTagLibrary} style={btnS(false)}>📚 Tag Library</button>
+          <button onClick={onOpenTagLibrary} style={btnS(false)}>📚 Tag Library</button>
         )}
-        <button data-testid="pdf-reader-add-to-selection-btn" onClick={() => toggleSelect(currentPage)}
+        <button onClick={() => toggleSelect(currentPage)}
           style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
             border: `1.5px solid ${selectedPages.has(currentPage) ? "#6E40C9" : "#2D3748"}`,
             background: selectedPages.has(currentPage) ? "#21183A" : "#1A202C",
@@ -1477,19 +1658,19 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
           {selectedPages.has(currentPage) ? "✓ In selection" : "+ Add to selection"}
         </button>
         {selectedPages.size > 0 && (
-          <button data-testid="pdf-reader-create-complaint-btn" onClick={() => onCreateComplaint([...selectedPages].sort((a, b) => a - b), pdfDoc, docName)}
+          <button onClick={() => onCreateComplaint([...selectedPages].sort((a, b) => a - b), pdfDoc, docName)}
             style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", border: "none", background: "#6E40C9", color: "#fff" }}>
             ✨ Create Complaint ({selectedPages.size}p) →
           </button>
         )}
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", overflow: isMobile ? "auto" : "hidden" }}>
+      <div className="pdf-row" style={{ overflow: "hidden" }}>
         {/* Left: Chapters / Search */}
-        <div style={{ width: isMobile ? "100%" : 240, background: "#0D1117", borderRight: isMobile ? "none" : "1px solid #21262D", borderBottom: isMobile ? "1px solid #21262D" : "none", padding: "14px 12px", overflowY: "auto", flexShrink: 0, display: "flex", flexDirection: "column", maxHeight: isMobile ? 220 : "none" }}>
+        <div className="pdf-sidebar-left" style={{ background: "#0D1117", borderRight: "1px solid #21262D", padding: "14px 12px", overflowY: "auto" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 12, flexShrink: 0 }}>
             {[["chapters", "Chapters"], ["search", "🔍 Search"]].map(([id, label]) => (
-              <button key={id} data-testid={`pdf-reader-lefttab-${id}-btn`} onClick={() => setLeftTab(id)}
+              <button key={id} onClick={() => setLeftTab(id)}
                 style={{ flex: 1, fontSize: 12, fontWeight: 600, padding: "6px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "var(--font-sans)",
                   background: leftTab === id ? "#1A2E3D" : "transparent", color: leftTab === id ? "#58A6FF" : "#8B949E" }}>
                 {label}
@@ -1505,7 +1686,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {chapters.map((c, i) => (
-                  <button key={i} data-testid={`pdf-reader-chapter-${i}-btn`} disabled={c.page == null} onClick={() => goTo(c.page)}
+                  <button key={i} disabled={c.page == null} onClick={() => goTo(c.page)}
                     style={{ textAlign: "left", fontSize: 12, padding: "5px 8px", paddingLeft: 8 + c.depth * 12, borderRadius: 6, border: "none", cursor: c.page == null ? "default" : "pointer",
                       background: c.page === currentPage ? "#1A2E3D" : "transparent",
                       color: c.page == null ? "#3D4451" : c.page === currentPage ? "#58A6FF" : "#8B949E",
@@ -1518,11 +1699,11 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0 }}>
               <div style={{ display: "flex", gap: 6 }}>
-                <input data-testid="pdf-reader-search-input" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") runSearch(); }}
                   placeholder="Search this book…" autoFocus
                   style={{ flex: 1, padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 13, background: "#161B22", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
-                <button data-testid="pdf-reader-search-go-btn" onClick={runSearch} disabled={!searchQuery.trim() || !!indexProgress}
+                <button onClick={runSearch} disabled={!searchQuery.trim() || !!indexProgress}
                   style={{ padding: "7px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)", opacity: !searchQuery.trim() ? 0.5 : 1 }}>
                   Go
                 </button>
@@ -1539,7 +1720,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               )}
               <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                 {searchResults?.map(r => (
-                  <button key={r.page} data-testid={`pdf-reader-search-result-p${r.page}-btn`} onClick={() => goTo(r.page)}
+                  <button key={r.page} onClick={() => goTo(r.page)}
                     style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "1px solid #21262D", cursor: "pointer", background: r.page === currentPage ? "#1A2E3D" : "#161B22", fontFamily: "var(--font-sans)" }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: "#58A6FF", margin: "0 0 3px" }}>p.{r.page} <span style={{ color: "#6E7681", fontWeight: 400 }}>· {r.count} match{r.count !== 1 ? "es" : ""}</span></p>
                     <p style={{ fontSize: 11, color: "#8B949E", margin: 0, lineHeight: 1.4 }}>
@@ -1556,7 +1737,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Canvas */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "auto", display: "flex", justifyContent: "center", alignItems: "flex-start", padding: isMobile ? "16px 8px" : "28px 24px", background: "#0D1117", position: "relative" }}>
+        <div className="pdf-center" style={{ overflowY: "auto", overflowX: "auto", padding: "28px 24px", background: "#0D1117", position: "relative", alignItems: "flex-start", justifyContent: "center" }}>
           {loadError ? (
             <div style={{ color: "#F87171", fontSize: 14, marginTop: 60, textAlign: "center", maxWidth: 400 }}>
               <p style={{ fontSize: 24, margin: "0 0 12px" }}>⚠️</p>
@@ -1583,7 +1764,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         </div>
 
         {/* Right panel */}
-        <div style={{ width: isMobile ? "100%" : 240, background: "#161B22", borderLeft: isMobile ? "none" : "1px solid #21262D", borderTop: isMobile ? "1px solid #21262D" : "none", padding: "16px 14px", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, flexShrink: 0, maxHeight: isMobile ? 320 : "none" }}>
+        <div className="pdf-sidebar-right" style={{ background: "#161B22", borderLeft: "1px solid #21262D", padding: "16px 14px", overflowY: "auto", gap: 16 }}>
 
           {/* Tag form */}
           {showTagPanel && (
@@ -1592,7 +1773,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
 
               <div style={{ display: "flex", gap: 4 }}>
                 {[["page", "Whole page"], ["region", "Select area"]].map(([id, label]) => (
-                  <button key={id} data-testid={`pdf-reader-tagmode-${id}-btn`} onClick={() => { setTagMode(id); setDragRect(null); setDragStart(null); }}
+                  <button key={id} onClick={() => { setTagMode(id); setDragRect(null); setDragStart(null); }}
                     style={{ flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 4px", borderRadius: 6, cursor: "pointer", fontFamily: "var(--font-sans)",
                       border: `1px solid ${tagMode === id ? "#A78BFA" : "#30363D"}`,
                       background: tagMode === id ? "#21183A" : "transparent", color: tagMode === id ? "#A78BFA" : "#8B949E" }}>
@@ -1601,7 +1782,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                 ))}
               </div>
 
-              <input data-testid="pdf-reader-tag-label-input" value={tagLabel} onChange={e => setTagLabel(e.target.value)} placeholder="Label, e.g. Fever" list="tag-library-labels"
+              <input value={tagLabel} onChange={e => setTagLabel(e.target.value)} placeholder="Label, e.g. Fever" list="tag-library-labels"
                 style={{ padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 13, background: "#0D1117", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
               <datalist id="tag-library-labels">
                 {tagLibrary.map(t => <option key={t.id} value={t.label} />)}
@@ -1609,7 +1790,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               <p style={{ fontSize: 10, color: "#484F58", margin: 0 }}>Reuse an existing tag name to add this page under it, from any PDF.</p>
 
               {tagMode === "page" ? (
-                <input data-testid="pdf-reader-tag-pages-input" value={tagPages} onChange={e => setTagPages(e.target.value)} placeholder={`Pages (blank = current p.${currentPage})`}
+                <input value={tagPages} onChange={e => setTagPages(e.target.value)} placeholder={`Pages (blank = current p.${currentPage})`}
                   style={{ padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 12, background: "#0D1117", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
               ) : (
                 <p style={{ fontSize: 11, color: dragRect ? "#A78BFA" : "#6E7681", margin: 0 }}>
@@ -1617,7 +1798,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                 </p>
               )}
 
-              <button data-testid="pdf-reader-save-tag-btn" onClick={saveTag} disabled={savingTag || (tagMode === "region" && (!dragRect || dragRect.w < 4))}
+              <button onClick={saveTag} disabled={savingTag || (tagMode === "region" && (!dragRect || dragRect.w < 4))}
                 style={{ padding: "7px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", background: TEAL.primary, color: "#fff", border: "none", fontFamily: "var(--font-sans)",
                   opacity: (tagMode === "region" && (!dragRect || dragRect.w < 4)) ? 0.5 : 1 }}>
                 {savingTag ? "Saving…" : "Save Tag (auto-extracts image + text)"}
@@ -1633,7 +1814,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               : currentTags.map((t, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0D1117", borderRadius: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 12, color: "#58A6FF", fontWeight: 600 }}>🏷 {t.label}</span>
-                  <button data-testid={`pdf-reader-currentpage-tag-${i}-remove-btn`} onClick={() => onRemoveTagSource(t.id, docName, currentPage)}
+                  <button onClick={() => onRemoveTagSource(t.id, docName, currentPage)}
                     style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer" }}>✕</button>
                 </div>
               ))
@@ -1650,7 +1831,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                   <p style={{ fontSize: 12, fontWeight: 600, color: "#E6EDF3", margin: "0 0 5px" }}>{t.label}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {t.sources.filter(s => s.docName === docName).map(s => (
-                      <button key={s.page} data-testid={`pdf-reader-alltags-${t.id}-p${s.page}-btn`} onClick={() => goTo(s.page)}
+                      <button key={s.page} onClick={() => goTo(s.page)}
                         style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${currentPage === s.page ? TEAL.primary : "#30363D"}`,
                           background: currentPage === s.page ? TEAL.bg : "#0D1117", color: currentPage === s.page ? TEAL.primary : "#8B949E", cursor: "pointer", fontFamily: "var(--font-mono)" }}>
                         p.{s.page}
@@ -1668,13 +1849,13 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               <p style={{ fontSize: 11, fontWeight: 700, color: "#6E7681", margin: "0 0 6px", letterSpacing: 0.5 }}>SELECTED PAGES</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                 {[...selectedPages].sort((a, b) => a - b).map(p => (
-                  <button key={p} data-testid={`pdf-reader-selected-p${p}-btn`} onClick={() => toggleSelect(p)}
+                  <button key={p} onClick={() => toggleSelect(p)}
                     style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #6E40C9", background: "#21183A", color: "#A78BFA", cursor: "pointer" }}>
                     p.{p} ✕
                   </button>
                 ))}
               </div>
-              <button data-testid="pdf-reader-clear-selection-btn" onClick={() => setSelectedPages(new Set())}
+              <button onClick={() => setSelectedPages(new Set())}
                 style={{ fontSize: 11, color: "#6E7681", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "var(--font-sans)" }}>
                 Clear selection
               </button>
@@ -1701,12 +1882,12 @@ function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, on
         <div style={{ width: 260, borderRight: "1px solid var(--color-border-primary)", overflowY: "auto", flexShrink: 0 }}>
           <div style={{ padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📚 Tag Library</p>
-            <button data-testid="tag-library-modal-close-btn" onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+            <button onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
           </div>
           {tagLibrary.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: "0 16px" }}>No tags yet. Open a PDF reader and tag some pages.</p>
           ) : tagLibrary.map(t => (
-            <div key={t.id} data-testid={`tag-library-modal-tag-${t.id}-item`} onClick={() => setSelectedId(t.id)}
+            <div key={t.id} onClick={() => setSelectedId(t.id)}
               style={{ padding: "10px 16px", cursor: "pointer", borderLeft: `3px solid ${selectedId === t.id ? TEAL.primary : "transparent"}`,
                 background: selectedId === t.id ? TEAL.bg : "transparent", display: "flex", gap: 10, alignItems: "center" }}>
               {t.sources[0]?.image && (
@@ -1728,7 +1909,7 @@ function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, on
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                 <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>🏷 {selected.label}</h3>
-                <button data-testid="tag-library-modal-delete-tag-btn" onClick={() => onRemoveTag(selected.id)}
+                <button onClick={() => onRemoveTag(selected.id)}
                   style={{ fontSize: 12, color: RED.primary, background: RED.bg, border: `1px solid ${RED.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                   Delete tag
                 </button>
@@ -1738,7 +1919,7 @@ function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, on
                   <div key={i} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 14 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <p style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, margin: 0 }}>{s.docName} — p.{s.page}</p>
-                      <button data-testid={`tag-library-modal-view-in-pdf-${i}-btn`} onClick={() => onOpenReader(s.docName, s.page)}
+                      <button onClick={() => onOpenReader(s.docName, s.page)}
                         disabled={!pdfBuffers.current.has(s.docName)}
                         style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6, border: `1px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary, cursor: pdfBuffers.current.has(s.docName) ? "pointer" : "not-allowed", opacity: pdfBuffers.current.has(s.docName) ? 1 : 0.4, fontFamily: "var(--font-sans)" }}>
                         📖 View in PDF
@@ -1805,7 +1986,7 @@ function PageViewer({ docName, page, pdfBuffers, onClose }) {
         onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📖 {docName} — Page {page}</p>
-          <button data-testid="page-viewer-close-btn" onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
         </div>
         {error ? <p style={{ fontSize: 13, color: RED.text }}>{error}</p> : <canvas ref={canvasRef} style={{ maxWidth: "100%", borderRadius: 6, border: "1px solid var(--color-border-primary)" }} />}
       </div>
@@ -1830,7 +2011,7 @@ function DiagnosisSidebar({ sidebar, onClose, query, complaintTags, pdfBuffers }
               {sidebar.ms != null ? `Retrieved in ${sidebar.ms}ms · ` : ""}{sidebar.chunks?.length || 0} sections
             </p>
           </div>
-          <button data-testid="diagnosis-sidebar-close-btn" onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
         {complaintTags?.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1839,7 +2020,7 @@ function DiagnosisSidebar({ sidebar, onClose, query, complaintTags, pdfBuffers }
               <div key={`${t.id}-${i}`} style={{ background: "#E8F4FF", border: "1px solid #B3D4F5", borderRadius: 10, padding: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#1A5C9A" }}>🏷 {t.label} — {s.docName} p.{s.page}</span>
-                  <button data-testid={`diagnosis-sidebar-view-in-pdf-${t.id}-${i}-btn`} onClick={() => setPageViewer({ docName: s.docName, page: s.page })}
+                  <button onClick={() => setPageViewer({ docName: s.docName, page: s.page })}
                     style={{ fontSize: 11, fontWeight: 600, color: "#1A5C9A", background: "#fff", border: "1px solid #B3D4F5", borderRadius: 6, padding: "2px 8px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                     View in PDF
                   </button>
@@ -1880,6 +2061,126 @@ function DiagnosisSidebar({ sidebar, onClose, query, complaintTags, pdfBuffers }
   );
 }
 
+// ─── SuperTags Card ──────────────────────────────────────────────────────────
+function SuperTagsCard({ tagLibrary, idx, complaintName, history, pdfBuffers }) {
+  const [matches, setMatches] = useState([]);
+  const [pageViewer, setPageViewer] = useState(null);
+
+  useEffect(() => {
+    const historyAnswers = history.map(h => h.a).join(" ");
+    const q = (complaintName + " " + historyAnswers).toLowerCase().trim();
+    if (!q) {
+      setMatches([]);
+      return;
+    }
+
+    const words = q.split(/\s+/).filter(w => w.length > 2);
+    if (words.length === 0) {
+      setMatches([]);
+      return;
+    }
+
+    const matchedTags = tagLibrary.filter(tag => {
+      const tagLabel = tag.label.toLowerCase();
+      const matchesLabel = words.some(w => tagLabel.includes(w));
+      const matchesSourceText = tag.sources.some(src => 
+        words.some(w => src.extractedText?.toLowerCase().includes(w))
+      );
+      return matchesLabel || matchesSourceText;
+    });
+
+    let directChunks = [];
+    if (idx && typeof idx.search === "function") {
+      try {
+        directChunks = idx.search(q, 3) || [];
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    const combinedMatches = [];
+
+    matchedTags.forEach(t => {
+      t.sources.forEach((src) => {
+        combinedMatches.push({
+          type: "tag",
+          label: `🏷 ${t.label}`,
+          source: src.docName,
+          page: src.page,
+          text: src.extractedText || "No text.",
+          image: src.image
+        });
+      });
+    });
+
+    directChunks.forEach(chunk => {
+      const isDuplicate = combinedMatches.some(m => m.source === chunk.source && m.text.includes(chunk.text.slice(0, 50)));
+      if (!isDuplicate) {
+        combinedMatches.push({
+          type: "chunk",
+          label: `📖 Relatable Passage`,
+          source: chunk.source,
+          page: chunk.page || 1,
+          text: chunk.text,
+          score: chunk.score
+        });
+      }
+    });
+
+    setMatches(combinedMatches.slice(0, 3));
+  }, [tagLibrary, idx, complaintName, history]);
+
+  return (
+    <div style={{ marginTop: 16, borderTop: "1.5px solid var(--color-border-primary)", paddingTop: 16 }}>
+      <div style={{ background: "#F3EEFF", border: "1.5px solid #D8C7FF", borderRadius: 12, padding: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#3E2570", display: "inline-flex", alignItems: "center", gap: 4 }}>✨ SuperTags</span>
+          <span style={{ fontSize: 9, background: "#6E40C9", color: "#fff", padding: "2px 6px", borderRadius: 10, fontWeight: 700 }}>AI FILTERED</span>
+        </div>
+        <p style={{ fontSize: 11, color: "#3E2570", margin: "0 0 12px", lineHeight: 1.4, opacity: 0.85 }}>
+          Upload multiple books and from them create your custom tags, and view them at any time from your OPD.
+        </p>
+
+        {matches.length === 0 ? (
+          <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0, fontStyle: "italic" }}>
+            No matching tags or book passages found for the current context.
+          </p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {matches.map((item, index) => (
+              <div key={index} style={{ background: "#fff", border: "1px solid #D8C7FF", borderRadius: 8, padding: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#6E40C9" }}>{item.label}</span>
+                  <button 
+                    onClick={() => setPageViewer({ docName: item.source, page: item.page })}
+                    style={{ fontSize: 10, fontWeight: 600, color: "#6E40C9", background: "#F3EEFF", border: "1px solid #D8C7FF", borderRadius: 5, padding: "1px 6px", cursor: "pointer" }}
+                  >
+                    p.{item.page} ↗
+                  </button>
+                </div>
+                {item.image && (
+                  <img src={item.image} alt="" style={{ maxWidth: "100%", maxHeight: 100, borderRadius: 4, marginBottom: 4, display: "block" }} />
+                )}
+                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.4, maxHeight: 60, overflowY: "auto" }}>
+                  {item.text.slice(0, 180)}{item.text.length > 180 ? "…" : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {pageViewer && (
+        <PageViewer 
+          docName={pageViewer.docName} 
+          page={pageViewer.page} 
+          pdfBuffers={pdfBuffers} 
+          onClose={() => setPageViewer(null)} 
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Differentials Panel ──────────────────────────────────────────────────────
 function DifferentialsPanel({ differentials, onClickDiag }) {
   return (
@@ -1889,7 +2190,7 @@ function DifferentialsPanel({ differentials, onClickDiag }) {
       {differentials.map((d, i) => {
         const col = LIKELIHOOD_COLORS[d.likelihood] || LIKELIHOOD_COLORS.low;
         return (
-          <div key={i} data-testid={`differential-card-${i}`} onClick={() => onClickDiag(d.name)}
+          <div key={i} onClick={() => onClickDiag(d.name)}
             style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px", borderRadius: 10, cursor: "pointer",
               background: col.bg, border: `1.5px solid ${col.border}`, transition: "all 0.15s" }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: col.dot, flexShrink: 0, marginTop: 4 }} />
@@ -1908,10 +2209,10 @@ function DifferentialsPanel({ differentials, onClickDiag }) {
 }
 
 // ─── Option Button ────────────────────────────────────────────────────────────
-function OptionButton({ label, onClick, testId }) {
+function OptionButton({ label, onClick }) {
   const [hov, setHov] = useState(false);
   return (
-    <button data-testid={testId} onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ width: "100%", padding: "12px 16px", textAlign: "left", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer",
         border: `1.5px solid ${hov ? TEAL.border : "var(--color-border-primary)"}`,
         background: hov ? TEAL.bg : "#fff", color: "var(--color-text-primary)", transition: "all 0.15s", fontFamily: "var(--font-sans)" }}>
@@ -1922,7 +2223,7 @@ function OptionButton({ label, onClick, testId }) {
 
 // ─── Consultation Screen ──────────────────────────────────────────────────────
 function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tagLibrary, pdfBuffers, setSettingsOpen }) {
-  const { complaint, age, sex, aiOnly } = session;
+  const { complaint, age, sex, aiOnly, opdMode } = session;
   const complaintTags = (complaint.tagRefs || []).map(id => tagLibrary.find(t => t.id === id)).filter(Boolean);
 
   const [history, setHistory] = useState([]);
@@ -1943,6 +2244,8 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
   const [customIn, setCustomIn] = useState("");
   const [weightMap, setWeightMap] = useState({});
   const [sidebar, setSidebar] = useState({ open: false, diagnosis: "", chunks: [], ms: null });
+  const [opdQuestions, setOpdQuestions] = useState([]);
+  const [opdAnswers, setOpdAnswers] = useState({});
   
   // Discussion Mode states
   const [discussionMode, setDiscussionMode] = useState(false);
@@ -1976,6 +2279,7 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
     }
     // AI-only mode: skip local workflow entirely
     if (aiOnly) { askAI([]); return; }
+    if (opdMode) { askAI([]); return; }
     if (complaint.workflow?.nodes) {
       const entry = complaint.workflow.nodes.find(n => n.id === complaint.workflow.entryNode);
       if (entry) {
@@ -2018,7 +2322,31 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
       : [];
 
     let systemPrompt = buildSystemPrompt(complaint.name, age, sex, combinedContext);
-    if (discussionMode) {
+    if (opdMode) {
+      systemPrompt = `Clinical thinking assistant for junior doctors, India government hospital OPD.
+Patient: ${age || "?"}y ${sex || ""}. Chief complaint: ${complaint.name}.
+
+CLINICAL REFERENCE (retrieved via BM25):
+${combinedContext}
+
+You are in OPD Mode (fast-track). Instead of one question, you MUST generate exactly 3 to 4 distinct, parallel questions to narrow down the differentials.
+Output ONLY valid JSON. No markdown. No explanation. Exactly this structure:
+{
+  "opd_questions": [
+    { "key": "unique_short_key", "question": "Question text here?", "options": ["opt1", "opt2", "opt3", "Not present"] }
+  ],
+  "differentials": [{"name":"...","likelihood":"high|medium|low","reasoning":"one line max"}],
+  "red_flags": ["..."],
+  "done": false
+}
+
+Rules for opd_questions:
+- "key": unique alphanumeric key for the question, e.g. "fever_dur"
+- "question": concise clinical question to ask
+- "options": 3-4 short options, always ending with "Not present" or "Unsure". If it is open-ended or numeric, options can be []
+- Never duplicate questions already in the history.
+- If consultation is complete, set "done": true and empty opd_questions [].`;
+    } else if (discussionMode) {
       systemPrompt = `Interactive clinical discussion assistant for junior doctors, India government hospital OPD.
 Patient: ${age || "?"}y ${sex || ""}. Chief complaint: ${complaint.name}.
 
@@ -2047,15 +2375,19 @@ Rules:
       await callAIStream(msgs, systemPrompt, provider, apiKey, t => { raw = t; setStreamText(t); });
       const parsed = parseJSON(raw);
       if (parsed) {
-        setCurrentQ(parsed.question || "");
-        let nextOpts = parsed.options || [];
-        if (parsed.done && hist.length >= 9) {
-          nextOpts = [
-            "Generate note with current findings",
-            "💬 Discuss further with AI (upload reports & chat)"
-          ];
+        if (opdMode) {
+          setOpdQuestions(parsed.opd_questions || []);
+        } else {
+          setCurrentQ(parsed.question || "");
+          let nextOpts = parsed.options || [];
+          if (parsed.done && hist.length >= 9) {
+            nextOpts = [
+              "Generate note with current findings",
+              "💬 Discuss further with AI (upload reports & chat)"
+            ];
+          }
+          setOptions(nextOpts);
         }
-        setOptions(nextOpts);
         if (parsed.differentials?.length) setDifferentials(parsed.differentials.slice(0, 5));
         if (parsed.red_flags?.length) setRedFlags(p => [...new Set([...p, ...parsed.red_flags])]);
       } else { setError("Could not parse AI response. Tap to retry."); }
@@ -2152,20 +2484,18 @@ Rules:
     rec.start(); recRef.current = rec; setVoiceOn(true);
   };
 
-  const isMobile = useIsMobile();
-
   return (
-    <div data-testid="consultation-screen" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-background-primary)" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-background-primary)" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "12px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
         <span style={{ fontSize: 20 }}>🩺</span>
         <Badge color={TEAL}>{age} · {sex}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>{complaint.name}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>Q{history.length + 1}</Badge>
-        {aiOnly && <Badge color={{ bg: "#1E1E2E", text: "#A5A5FF", border: "#5B5BDB" }}>✨ AI Mode</Badge>}
+        {aiOnly && <Badge color={{ bg: "#4c1d95", text: "#F3E8FF", border: "#A855F7" }}>✨ AI Mode</Badge>}
         {retrieveMs && <span style={{ fontSize: 11, color: TEAL.primary, fontWeight: 600 }}>⚡ {retrieveMs}ms</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <Btn testId="consultation-generate-note-btn" small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
-          <Btn testId="consultation-end-btn" small variant="ghost" onClick={onEnd}>End</Btn>
+          <Btn small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
+          <Btn small variant="ghost" onClick={onEnd}>End</Btn>
         </div>
       </div>
 
@@ -2176,7 +2506,7 @@ Rules:
         </div>
       )}
 
-      <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 300px", overflow: "auto" }}>
+      <div className="consultation-layout" style={{ flex: 1, overflow: "hidden" }}>
         <div style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
           {history.length > 0 && (
             <div ref={histRef} style={{ maxHeight: 150, overflowY: "auto", background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 14px" }}>
@@ -2197,12 +2527,9 @@ Rules:
                   {(() => {
                     if (!streamText) return "Thinking…";
                     try {
-                      // Attempt to parse incomplete/streaming JSON to extract the question
                       const cleaned = streamText.replace(/```json|```/g, "").trim();
-                      // Find if we have a "question" field inside the raw stream
                       const match = cleaned.match(/"question"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
                       if (match && match[1]) {
-                        // Unescape double quotes and newlines
                         return match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
                       }
                     } catch (e) {}
@@ -2215,12 +2542,84 @@ Rules:
                 <p style={{ fontSize: 14, color: AMBER.text, fontWeight: 500, margin: "0 0 12px" }}>{error}</p>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {history.length >= 4 && (
-                    <Btn testId="consultation-generate-note-offline-btn" small onClick={() => onNote(history, differentials, redFlags)}>Generate Note Offline →</Btn>
+                    <Btn small onClick={() => onNote(history, differentials, redFlags)}>Generate Note Offline →</Btn>
                   )}
                   {!apiKey && setSettingsOpen && (
-                    <Btn testId="consultation-add-api-key-btn" small variant="secondary" onClick={() => setSettingsOpen(true)}>⚙️ Add API Key</Btn>
+                    <Btn small variant="secondary" onClick={() => setSettingsOpen(true)}>⚙️ Add API Key</Btn>
                   )}
                 </div>
+              </div>
+            ) : opdMode ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <p style={{ fontSize: 15, fontWeight: 800, margin: 0, color: TEAL.primary, display: "flex", alignItems: "center", gap: 6 }}>⚡ OPD Fast-Track (Ask parallel questions)</p>
+                {opdQuestions.length === 0 ? (
+                  <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>Loading questions...</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {opdQuestions.map((qObj, index) => {
+                      const ans = opdAnswers[qObj.key] || "";
+                      const opts = qObj.options || [];
+                      return (
+                        <div key={qObj.key || index} style={{ borderBottom: index < opdQuestions.length - 1 ? "1px solid var(--color-border-primary)" : "none", paddingBottom: index < opdQuestions.length - 1 ? 14 : 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 8px", color: "var(--color-text-primary)", lineHeight: 1.4 }}>{index + 1}. {qObj.question}</p>
+                          
+                          {opts.length > 0 && (
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                              {opts.map(opt => {
+                                const active = ans === opt;
+                                return (
+                                  <button
+                                    key={opt}
+                                    onClick={() => setOpdAnswers(prev => ({ ...prev, [qObj.key]: opt }))}
+                                    style={{
+                                      padding: "6px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1px solid", fontFamily: "var(--font-sans)",
+                                      borderColor: active ? TEAL.primary : "var(--color-border-primary)",
+                                      background: active ? TEAL.bg : "#fff",
+                                      color: active ? TEAL.primary : "var(--color-text-secondary)",
+                                      transition: "all 0.15s"
+                                    }}
+                                  >
+                                    {opt}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <input
+                            value={ans}
+                            onChange={e => setOpdAnswers(prev => ({ ...prev, [qObj.key]: e.target.value }))}
+                            placeholder={opts.length > 0 ? "Or type a custom answer..." : "Type answer..."}
+                            style={{
+                              width: "100%", padding: "8px 12px", border: "1.5px solid var(--color-border-primary)",
+                              borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "var(--font-sans)",
+                              background: "#fff", color: "var(--color-text-primary)"
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                    
+                    <Btn 
+                      disabled={Object.keys(opdAnswers).length === 0} 
+                      onClick={() => {
+                        const newHist = [...history];
+                        opdQuestions.forEach(qObj => {
+                          const ans = opdAnswers[qObj.key];
+                          if (ans && ans.trim()) {
+                            newHist.push({ q: qObj.question, a: ans.trim() });
+                          }
+                        });
+                        setHistory(newHist);
+                        setOpdAnswers({});
+                        askAI(newHist);
+                      }}
+                      style={{ alignSelf: "flex-end", marginTop: 8 }}
+                    >
+                      ⚡ Submit OPD Answers ({Object.keys(opdAnswers).length})
+                    </Btn>
+                  </div>
+                )}
               </div>
             ) : (
               <p style={{ fontSize: 16, fontWeight: 500, margin: 0, lineHeight: 1.6 }}>
@@ -2236,47 +2635,51 @@ Rules:
             </div>
           )}
 
-          {!loading && !error && options.map((opt, i) => (
-            <OptionButton key={i} testId={`consultation-option-${i}-btn`} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
+          {!loading && !error && !opdMode && options.map((opt, i) => (
+            <OptionButton key={i} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
           ))}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button data-testid="consultation-voice-btn" onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
-                  border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
-                  background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
-                {voiceOn && <span style={{ width: 8, height: 8, borderRadius: "50%", background: RED.primary, animation: "pulse 1s infinite" }} />}
-                🎙 {voiceOn ? "Stop" : "Speak"}
-              </button>
-              {voiceTx && !voiceOn && (
-                <button data-testid="consultation-use-voice-transcript-btn" onClick={() => handleAnswer(voiceTx)}
-                  style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
-                    border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
-                  Use this →
-                </button>
-              )}
-              {discussionMode && (
-                <Btn testId="consultation-generate-note-discussion-btn" small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
-                  Generate Note ({history.length} items) →
-                </Btn>
-              )}
-            </div>
-            {(voiceOn || voiceTx) && (
-              <div style={{ padding: "10px 14px", background: "#F0FFF8", border: `1.5px solid ${TEAL.border}`, borderRadius: 8, fontSize: 13, color: TEAL.text, minHeight: 40 }}>
-                {voiceTx || <span style={{ opacity: 0.5 }}>Listening…</span>}
+          {!opdMode && (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+                    style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
+                      border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
+                      background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
+                    {voiceOn && <span style={{ width: 8, height: 8, borderRadius: "50%", background: RED.primary, animation: "pulse 1s infinite" }} />}
+                    🎙 {voiceOn ? "Stop" : "Speak"}
+                  </button>
+                  {voiceTx && !voiceOn && (
+                    <button onClick={() => handleAnswer(voiceTx)}
+                      style={{ padding: "9px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
+                        border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
+                      Use this →
+                    </button>
+                  )}
+                  {discussionMode && (
+                    <Btn small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
+                      Generate Note ({history.length} items) →
+                    </Btn>
+                  )}
+                </div>
+                {(voiceOn || voiceTx) && (
+                  <div style={{ padding: "10px 14px", background: "#F0FFF8", border: `1.5px solid ${TEAL.border}`, borderRadius: 8, fontSize: 13, color: TEAL.text, minHeight: 40 }}>
+                    {voiceTx || <span style={{ opacity: 0.5 }}>Listening…</span>}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <input data-testid="consultation-custom-answer-input" value={customIn} onChange={e => setCustomIn(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && customIn.trim()) handleAnswer(customIn.trim()); }}
-              placeholder="Or type a custom answer…"
-              style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
-            <button data-testid="consultation-custom-answer-submit-btn" onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
-              style={{ padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)" }}>→</button>
-          </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={customIn} onChange={e => setCustomIn(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && customIn.trim()) handleAnswer(customIn.trim()); }}
+                  placeholder="Or type a custom answer…"
+                  style={{ flex: 1, padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
+                <button onClick={() => customIn.trim() && handleAnswer(customIn.trim())}
+                  style={{ padding: "9px 16px", borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)" }}>→</button>
+              </div>
+            </>
+          )}
 
           {retrieved.length > 0 && (
             <div style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 12 }}>
@@ -2291,8 +2694,9 @@ Rules:
           )}
         </div>
 
-        <div style={{ borderLeft: isMobile ? "none" : "1px solid var(--color-border-primary)", borderTop: isMobile ? "1px solid var(--color-border-primary)" : "none", padding: 16, overflowY: "auto", background: "#fff" }}>
+        <div className="consultation-sidebar" style={{ borderLeft: "1px solid var(--color-border-primary)", padding: 16, overflowY: "auto", background: "#fff" }}>
           <DifferentialsPanel differentials={differentials} onClickDiag={openSidebar} />
+          <SuperTagsCard tagLibrary={tagLibrary} idx={idx} complaintName={complaint.name} history={history} pdfBuffers={pdfBuffers} />
         </div>
       </div>
 
@@ -2337,7 +2741,7 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
   const providerName = getProvider(provider)?.name || provider;
 
   return (
-    <div data-testid="note-screen" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h2 style={{ fontSize: 18, fontWeight: 800, margin: "0 0 2px" }}>Clinical Note</h2>
@@ -2348,8 +2752,8 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
-          <Btn testId="note-copy-btn" small variant="ghost" onClick={() => navigator.clipboard?.writeText(note)}>Copy</Btn>
-          <Btn testId="note-new-patient-btn" small onClick={onNewPatient}>New Patient</Btn>
+          <Btn small variant="ghost" onClick={() => navigator.clipboard?.writeText(note)}>Copy</Btn>
+          <Btn small onClick={onNewPatient}>New Patient</Btn>
         </div>
       </div>
       <div style={{ flex: 1, padding: 24, maxWidth: 760, margin: "0 auto", width: "100%" }}>
@@ -2377,7 +2781,7 @@ function NoteScreen({ session, history, differentials, redFlags, provider, apiKe
 
 // ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [product, setProduct] = useState("clinicalmind"); // "clinicalmind" | "supersummary"
+  const [product, setProduct] = useState(null); // null = Home Screen, "clinicalmind" | "supersummary"
   const [phase, setPhase] = useState("library");
   const [provider, setProvider] = useState(() => localStorage.getItem("clinicalmind:provider") || "claude");
   const [apiKey, setApiKey] = useState(() => apiKeyFor(localStorage.getItem("clinicalmind:provider") || "claude"));
@@ -2415,17 +2819,146 @@ export default function App() {
         currentKey={apiKey}
         setCurrentKey={handleKeyChange}
       />
+      {product === null && (
+        <div style={{ minHeight: "100vh", background: "var(--color-background-primary)", display: "flex", flexDirection: "column" }}>
+          {/* Header — premium gradient */}
+          <div className="hero-band" style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: 26 }}>⚡</span>
+              <div>
+                <h1 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: "#fff", letterSpacing: "-0.5px" }}>ClinicFlow</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0, fontWeight: 500 }}>Comprehensive Clinical Intelligence Suite</p>
+              </div>
+            </div>
+            <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
+          </div>
+
+          {/* Main Dashboard Cards Container */}
+          <div style={{ flex: 1, padding: "32px 20px 0", width: "100%", maxWidth: 1040, margin: "0 auto" }}>
+            {/* Animated premium hero carousel */}
+            <HomeHero />
+
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 18 }}>
+              <div>
+                <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text-primary)", margin: 0 }}>Choose your workspace</h2>
+                <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Two tools, one clinical suite — pick where you want to start.</p>
+              </div>
+            </div>
+
+            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
+              {/* Card 1: ClinicFlow */}
+              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
+                <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
+                  <CardCarousel accent="#0d9488" slides={[IllustConsult, IllustDifferential, IllustSafety]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🩺</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-teal-primary)", margin: 0 }}>ClinicFlow</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Interactive clinical consultations, patient history taking, differentials weighting, and automated clinical documentation designed for Indian OPDs.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "var(--color-teal-primary)", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(13, 148, 136, 0.2)" }}>
+                    Launch ClinicFlow →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 2: SuperSummary */}
+              <Card onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
+                <div style={{ background: "#f5f3ff", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
+                  <CardCarousel accent="#7c3aed" slides={[IllustDocs, IllustScan]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>📋</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-purple-primary, #7c3aed)", margin: 0 }}>SuperSummary</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Advanced discharge summary generator. Create templates, parse intake documents via OCR, review safety checklists, and save/export results.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#7c3aed", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(124, 58, 237, 0.2)" }}>
+                    Launch SuperSummary →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 3: SuperMemory — your reference library, surfaced right on the home page */}
+              <Card onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
+                <div style={{ background: "#fff7ed", borderBottom: "1px solid rgba(245, 158, 11, 0.1)" }}>
+                  <CardCarousel accent="#f59e0b" slides={[IllustLibrary, IllustDocs]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>✨</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#b45309", margin: 0 }}>SuperMemory</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Your textbooks and hospital protocols, AI-indexed. Upload once, then search or jump to the exact page mid-consult — fully offline.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(245, 158, 11, 0.25)" }}>
+                    Open SuperMemory →
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 4: MoProPrep — external gamified learning platform */}
+              <Card onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
+                <div style={{ background: "#ecfeff", borderBottom: "1px solid rgba(8, 145, 178, 0.1)" }}>
+                  <CardCarousel accent="#0891b2" slides={[IllustGame]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎮</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0891b2", margin: 0 }}>MoProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Learn medicine the fun way — a gamified prep platform with quizzes, streaks, and challenges. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
+                    Play & Learn ↗
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 5: DnbProPrep — external DNB exam prep platform */}
+              <Card onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
+                <div style={{ background: "#eef2ff", borderBottom: "1px solid rgba(79, 70, 229, 0.1)" }}>
+                  <CardCarousel accent="#4f46e5" slides={[IllustDnb]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎓</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4f46e5", margin: 0 }}>DnbProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Focused DNB exam preparation — structured practice and review material. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
+                    Prep for DNB ↗
+                  </button>
+                </div>
+              </Card>
+            </div>
+          </div>
+          <AppFooter />
+        </div>
+      )}
       {product === "supersummary" && (
         <div style={{ minHeight: "100vh" }}>
-          <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ background: "linear-gradient(120deg,#6E40C9,#9333EA)", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(124,58,237,0.25)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span style={{ fontSize: 22 }}>📋</span>
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#6E40C9" }}>SuperSummary</h1>
-                <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
+                <h1 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>SuperSummary</h1>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", margin: 0 }}>Discharge summaries — templates + OCR intake</p>
               </div>
             </div>
-            <ProductToggle product={product} setProduct={setProduct} />
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <ProductToggle product={product} setProduct={setProduct} />
+              <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
+            </div>
           </div>
           <SuperSummary provider={provider} apiKey={apiKey} setSettingsOpen={setSettingsOpen} />
         </div>
