@@ -1,0 +1,37 @@
+{
+  "summary": "Second-pass frontend-only testing of ClinicalMind (no backend, client-side app). Verified new data-testid attributes work correctly across Library screen, Document Vault, PDFReader, TagLibraryModal, ProductToggle and ProfileMenu. Deep-tested the previously-uncovered PDF flow end-to-end: uploaded a generated 5-page sample PDF, confirmed doc item + page count + Open Reader/Parse buttons render, opened PDFReader, verified page nav (next/prev/first/last), zoom select, Chapters/Search left-tabs, BM25 search-in-PDF (query 'differential diagnosis' correctly returned 1 highlighted match on p.2, clicking result navigated to that page), tag creation on a page (label 'Test Tag ABC'/'Fever Tag' saved and appeared under THIS PAGE + ALL TAGS IN BOOK), Tag Library modal (list item clickable, showed 'View in PDF' + 'Delete tag' buttons), and Create Complaint from 2 selected PDF pages (opened ComplaintEditor with noAiNotice banner correctly shown since no AI key configured, raw PDF text placed in Clinical Content). All matched the expected data-testid names from the review request exactly. Responsive pass done at 375x812 (mobile) and 768x1024 (tablet): tablet is clean, but mobile has 2 real layout bugs (see below). Regression spot-check: offline consultation flow (complaint select -> age -> Start Consultation -> Q&A -> differentials update) still works fine on desktop; SuperSummary Template Library -> flow-choice modal (Smart Editor/AI Wizard testids present) -> FillScreen with fillable blanks all working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Global top header bar (logo/title + ProductToggle + ProfileMenu)", "issue": "At 375px mobile viewport, the header row (`display:flex; justifyContent:space-between`) does not wrap or shrink — causes ~91px horizontal page overflow, cutting off the 'SuperSummary' toggle button and profile avatar off-screen to the right. Confirmed via document.documentElement.scrollWidth (466px) > clientWidth (375px).", "selector": "header div containing product-toggle-supersummary-btn / profile-menu-avatar-btn", "priority": "MEDIUM"},
+      {"component": "ConsultationScreen (question/answer panel)", "issue": "On 375px mobile viewport, the question card and each answer-option card are squeezed into a narrow fixed-width vertical column (~40-75px wide) instead of stacking full-width — text wraps one word per line ('How / long / has / the / feve / been / pres...'), making the question and options nearly unreadable/unusable on mobile. This is a genuine responsive layout bug, not just a minor overflow.", "selector": "consultation question/answer flex container", "priority": "HIGH"},
+      {"component": "PDFReader", "issue": "On 375px mobile viewport, top toolbar (page nav, zoom select, Tag/Tag Library/Add-to-selection buttons) and the 3-pane layout (Chapters/Search | page canvas | tags sidebar) cause horizontal overflow; buttons/text get cut off and are not all reachable without horizontal scroll.", "selector": "pdf-reader toolbar / 3-pane container", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mobile (375px) — Library screen, PDFReader, ConsultationScreen", "issues": ["No responsive breakpoint handling for the global header and several flex containers; app appears to be desktop-first with tablet (768px) working acceptably but true phone width (375px) breaking in 3 places noted above."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix global header (logo+title / ProductToggle+ProfileMenu) to wrap or condense on screens <400px so SuperSummary toggle and profile avatar remain reachable without horizontal scroll.",
+    "Fix ConsultationScreen question/answer flex layout to stack full-width on mobile instead of collapsing into narrow vertical text columns — this is the most user-impacting mobile bug found.",
+    "Add a mobile-responsive layout for PDFReader (stack left tabs / canvas / tags panel, or make them collapsible/tabbed) since the current 3-column layout doesn't fit phone widths.",
+    "No functional/data-testid bugs found — all requested selectors exist and work exactly as specified in the review request. Main agent does not need to touch data-testid work further."
+  ],
+  "critical_code_review_comments": [
+    "App.jsx remains very large (2464 lines) — unchanged from pass 1 observation, still worth splitting into separate component files eventually (not blocking).",
+    "PDF/BM25/tag/complaint-from-PDF pipeline is well-implemented and robust — search relevance, tag persistence, and the noAiNotice fallback path in ComplaintEditor all behaved exactly as designed with correct edge-case handling (no key configured)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A - no backend for this app by design", "frontend": "90%"},
+  "test_credentials": "None required -- app fully functional offline without API keys, as intended.",
+  "seed_data_creation": "Uploaded a generated 5-page sample PDF (/tmp/test_sample.pdf, copied to /app/.screenshots/test_sample.pdf) to Document Vault during multiple test runs; created ad-hoc tags ('Test Tag ABC', 'Fever Tag') and one draft private complaint from PDF selection. All data is browser-session localStorage only, not persistent server-side.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "PDF/BM25/TagLibrary/CreateComplaint-from-PDF flows are now fully verified working end-to-end with correct data-testid coverage -- no need to re-test these in depth again. Remaining open items are 3 mobile-responsive (375px) layout bugs: (1) global header overflow cutting off SuperSummary/profile controls, (2) ConsultationScreen question/answer panel collapsing into unreadable narrow columns (highest priority/most user-impacting), (3) PDFReader 3-pane layout not adapting to phone width. Tablet (768px) layout was clean with no issues. Desktop (1920px) regression of offline consultation and SuperSummary Template Library -> FillScreen flow both confirmed still working after the data-testid additions.",
+  "rca of the issue": "All 3 mobile bugs share the same root cause pattern: several flex/grid containers in App.jsx use fixed pixel gaps/paddings and `display:flex` without `flexWrap:wrap` or a mobile media-query breakpoint, so on narrow viewports (<400px) children either overflow the viewport (header, PDFReader) or get compressed into very narrow columns while text still tries to occupy vertical space rather than reflowing (ConsultationScreen). A `@media (max-width: 480px)` rule (or flexWrap + minWidth:0 + width:100% overrides) on these 3 containers would resolve all three."
+}

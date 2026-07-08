@@ -8,14 +8,14 @@ const AMBER  = { primary: "#EF9F27", bg: "#FAEEDA", border: "#FAC775", text: "#6
 const RED    = { primary: "#E24B4A", bg: "#FCEBEB", border: "#F7C1C1", text: "#791F1F" };
 const PURPLE = { primary: "#6E40C9", bg: "#F3EEFF", border: "#D8C7FF", text: "#3E2570" };
 
-function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {} }) {
+function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {}, testId, ...rest }) {
   const base = { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 8, fontFamily: "var(--font-sans)", cursor: disabled ? "not-allowed" : "pointer", fontWeight: 600, opacity: disabled ? 0.5 : 1, padding: small ? "6px 14px" : "10px 20px", fontSize: small ? 13 : 14, border: "none" };
   const variants = {
     primary:   { background: PURPLE.primary, color: "#fff" },
     secondary: { background: "transparent", color: PURPLE.primary, border: `1.5px solid ${PURPLE.border}` },
     ghost:     { background: "transparent", color: "var(--color-text-secondary)", border: `1.5px solid var(--color-border-primary)` },
   };
-  return <button style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled}>{children}</button>;
+  return <button data-testid={testId} style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled} {...rest}>{children}</button>;
 }
 function Card({ children, style: s = {} }) {
   return <div style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 12, padding: 16, boxShadow: "var(--shadow-sm)", ...s }}>{children}</div>;
@@ -73,7 +73,7 @@ export function DocumentIntake({ docs, setDocs, provider, apiKey, isInvestigatio
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onClick={() => fileRef.current?.click()}
         style={{ border: `2px dashed ${dragging ? PURPLE.primary : "var(--color-border-secondary)"}`, borderRadius: 10, padding: "18px 16px", textAlign: "center", cursor: "pointer", background: dragging ? PURPLE.bg : "var(--color-background-secondary)" }}>
-        <input ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: "none" }}
+        <input data-testid="document-intake-file-input" ref={fileRef} type="file" multiple accept="image/*,.pdf" style={{ display: "none" }}
           onChange={e => { Array.from(e.target.files).forEach(processFile); e.target.value = ""; }} />
         <p style={{ fontSize: 22, margin: "0 0 4px" }}>🧾</p>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>
@@ -81,7 +81,7 @@ export function DocumentIntake({ docs, setDocs, provider, apiKey, isInvestigatio
         </p>
       </div>
       {docs.map(d => (
-        <div key={d.id} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 10, display: "flex", gap: 10, alignItems: "center" }}>
+        <div key={d.id} data-testid={`document-intake-doc-${d.id}-item`} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 10, display: "flex", gap: 10, alignItems: "center" }}>
           <img src={d.dataURL} alt="" style={{ width: 42, height: 42, objectFit: "cover", borderRadius: 6, flexShrink: 0, background: "#ddd" }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ fontSize: 12, fontWeight: 600, margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</p>
@@ -89,7 +89,7 @@ export function DocumentIntake({ docs, setDocs, provider, apiKey, isInvestigatio
             {d.status === "done" && <p style={{ fontSize: 11, color: TEAL.primary, margin: 0 }}>✓ Read via {d.engine === "tesseract" ? `Tesseract ${d.confidence}%` : "AI vision"}</p>}
             {d.status === "failed" && <p style={{ fontSize: 11, color: RED.primary, margin: 0 }}>⚠ Could not read — enter manually</p>}
           </div>
-          <button onClick={() => setDocs(prev => prev.filter(x => x.id !== d.id))} style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button data-testid={`document-intake-doc-${d.id}-remove-btn`} onClick={() => setDocs(prev => prev.filter(x => x.id !== d.id))} style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
       ))}
     </div>
@@ -125,7 +125,7 @@ function SafetyCheckPanel({ getText, diagnosis, provider, apiKey }) {
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>🔍 AI Safety Check</h3>
-        <Btn small variant="secondary" onClick={run} disabled={checking}>{checking ? "Reviewing…" : flags ? "Re-check" : "Review for red flags"}</Btn>
+        <Btn testId="safety-check-run-btn" small variant="secondary" onClick={run} disabled={checking}>{checking ? "Reviewing…" : flags ? "Re-check" : "Review for red flags"}</Btn>
       </div>
       <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: "6px 0 0" }}>Flags dosing errors, unaddressed abnormal labs, and missing screenings/advice. Advisory only.</p>
       {error && <p style={{ fontSize: 13, color: RED.primary, margin: "10px 0 0" }}>{error}</p>}
@@ -185,6 +185,7 @@ function SaveAsTemplateModal({ defaultName = "", existingTemplates = [], onConfi
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 18px" }}>Give this template a unique name so you can find it later.</p>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Template Name</label>
             <input
+              data-testid="save-template-name-input"
               ref={inputRef}
               value={name}
               onChange={e => { setName(e.target.value); setError(""); }}
@@ -199,8 +200,8 @@ function SaveAsTemplateModal({ defaultName = "", existingTemplates = [], onConfi
               </div>
             )}
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 6 }}>
-              <Btn variant="ghost" small onClick={onClose}>Cancel</Btn>
-              <Btn small onClick={handleSave} disabled={!name.trim()}>Save Template</Btn>
+              <Btn testId="save-template-cancel-btn" variant="ghost" small onClick={onClose}>Cancel</Btn>
+              <Btn testId="save-template-confirm-btn" small onClick={handleSave} disabled={!name.trim()}>Save Template</Btn>
             </div>
           </>
         )}
@@ -387,7 +388,7 @@ Rules:
       <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: "100%", maxWidth: 900 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{template ? `Edit: ${template.name}` : "Create Template"}</h2>
-          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+          <button data-testid="template-editor-close-btn" onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
         </div>
 
         <div style={{ background: PURPLE.bg, border: `1px solid ${PURPLE.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: PURPLE.text, marginBottom: 16 }}>
@@ -395,28 +396,28 @@ Rules:
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-          <input style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Template name (e.g. Neonatal Jaundice)" />
-          <input style={inputS} value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" />
+          <input data-testid="template-editor-name-input" style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Template name (e.g. Neonatal Jaundice)" />
+          <input data-testid="template-editor-diagnosis-input" style={inputS} value={form.diagnosis} onChange={e => setForm(f => ({ ...f, diagnosis: e.target.value }))} placeholder="Diagnosis" />
         </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <Btn small variant="secondary" onClick={() => fileRef.current?.click()}>Upload .txt / .pdf</Btn>
-          <input ref={fileRef} type="file" accept=".txt,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
-          <Btn small onClick={beginSlot} disabled={!sel}>+ Make blank {sel ? `("${sel.text.slice(0, 20)}${sel.text.length > 20 ? "…" : ""}")` : "(select text first)"}</Btn>
+          <Btn testId="template-editor-upload-btn" small variant="secondary" onClick={() => fileRef.current?.click()}>Upload .txt / .pdf</Btn>
+          <input data-testid="template-editor-file-input" ref={fileRef} type="file" accept=".txt,.pdf" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value = ""; }} />
+          <Btn testId="template-editor-make-blank-btn" small onClick={beginSlot} disabled={!sel}>+ Make blank {sel ? `("${sel.text.slice(0, 20)}${sel.text.length > 20 ? "…" : ""}")` : "(select text first)"}</Btn>
           {sel && !slotDraft && (
-            <Btn small variant="ghost" onClick={() => setSel(null)} style={{ color: RED.primary }}>✕ Clear selection</Btn>
+            <Btn testId="template-editor-clear-selection-btn" small variant="ghost" onClick={() => setSel(null)} style={{ color: RED.primary }}>✕ Clear selection</Btn>
           )}
-          <Btn small variant="secondary" onClick={aiFindQuestions} disabled={!form.sampleBody.trim() || !apiKey || aiFinding}
+          <Btn testId="template-editor-ai-find-questions-btn" small variant="secondary" onClick={aiFindQuestions} disabled={!form.sampleBody.trim() || !apiKey || aiFinding}
             title={!apiKey ? "Needs an API key" : ""}>
             {aiFinding ? "✨ Analyzing…" : "✨ AI: find the questions"}
           </Btn>
-          <Btn small variant="secondary" onClick={undo} disabled={history.length === 0}>
+          <Btn testId="template-editor-undo-btn" small variant="secondary" onClick={undo} disabled={history.length === 0}>
             ↩ Undo
           </Btn>
         </div>
         {aiFindError && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>{aiFindError}</p>}
 
-        <textarea ref={bodyRef} value={form.sampleBody} onSelect={captureSelection}
+        <textarea data-testid="template-editor-sample-body-textarea" ref={bodyRef} value={form.sampleBody} onSelect={captureSelection}
           onChange={e => setForm(f => ({ ...f, sampleBody: e.target.value.replace(/\r\n/g, "\n") }))}
           placeholder="Paste your discharge summary here…"
           style={{ ...inputS, minHeight: 300, fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.7, resize: "vertical" }} />
@@ -425,23 +426,23 @@ Rules:
           <div style={{ background: PURPLE.bg, border: `1px solid ${PURPLE.border}`, borderRadius: 10, padding: 14, marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>Make "{sel?.text}" a blank</p>
-              <button onClick={() => { setSlotDraft(null); setSel(null); }} 
+              <button data-testid="template-editor-slotdraft-close-btn" onClick={() => { setSlotDraft(null); setSel(null); }} 
                 style={{ fontSize: 16, background: "none", border: "none", cursor: "pointer", color: PURPLE.primary, padding: 4, fontWeight: "bold" }}>
                 ✕
               </button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <input style={inputS} autoFocus value={slotDraft.label} onChange={e => setSlotDraft(s => ({ ...s, label: e.target.value }))} placeholder="Label, e.g. TSB at admission" />
-              <input style={inputS} value={slotDraft.ocrHints} onChange={e => setSlotDraft(s => ({ ...s, ocrHints: e.target.value }))} placeholder="OCR hints (optional): tsb, bilirubin" />
+              <input data-testid="template-editor-slot-label-input" style={inputS} autoFocus value={slotDraft.label} onChange={e => setSlotDraft(s => ({ ...s, label: e.target.value }))} placeholder="Label, e.g. TSB at admission" />
+              <input data-testid="template-editor-slot-ocrhints-input" style={inputS} value={slotDraft.ocrHints} onChange={e => setSlotDraft(s => ({ ...s, ocrHints: e.target.value }))} placeholder="OCR hints (optional): tsb, bilirubin" />
             </div>
-            <input style={inputS} value={slotDraft.question} onChange={e => setSlotDraft(s => ({ ...s, question: e.target.value }))} placeholder="Question to ask (optional), e.g. Sex?" />
-            <input style={inputS} value={slotDraft.options} onChange={e => setSlotDraft(s => ({ ...s, options: e.target.value }))} placeholder="Answer options (optional, comma-sep) — e.g. male, female. Leave blank for free text." />
+            <input data-testid="template-editor-slot-question-input" style={inputS} value={slotDraft.question} onChange={e => setSlotDraft(s => ({ ...s, question: e.target.value }))} placeholder="Question to ask (optional), e.g. Sex?" />
+            <input data-testid="template-editor-slot-options-input" style={inputS} value={slotDraft.options} onChange={e => setSlotDraft(s => ({ ...s, options: e.target.value }))} placeholder="Answer options (optional, comma-sep) — e.g. male, female. Leave blank for free text." />
             <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
-              <input type="checkbox" checked={slotDraft.mandatory} onChange={e => setSlotDraft(s => ({ ...s, mandatory: e.target.checked }))} /> Mandatory (always ask)
+              <input data-testid="template-editor-slot-mandatory-checkbox" type="checkbox" checked={slotDraft.mandatory} onChange={e => setSlotDraft(s => ({ ...s, mandatory: e.target.checked }))} /> Mandatory (always ask)
             </label>
             <div style={{ display: "flex", gap: 8 }}>
-              <Btn small onClick={confirmSlot} disabled={!slotDraft.label.trim()}>Add blank</Btn>
-              <Btn small variant="ghost" onClick={() => { setSlotDraft(null); setSel(null); }}>Cancel</Btn>
+              <Btn testId="template-editor-add-blank-btn" small onClick={confirmSlot} disabled={!slotDraft.label.trim()}>Add blank</Btn>
+              <Btn testId="template-editor-cancel-slot-btn" small variant="ghost" onClick={() => { setSlotDraft(null); setSel(null); }}>Cancel</Btn>
             </div>
           </div>
         )}
@@ -452,7 +453,7 @@ Rules:
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {form.slots.map(s => (
                 <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 16, background: s.mandatory ? PURPLE.bg : "var(--color-background-secondary)", color: s.mandatory ? PURPLE.primary : "var(--color-text-secondary)", border: `1px solid ${s.mandatory ? PURPLE.border : "var(--color-border-primary)"}` }}>
-                  {s.mandatory && "★ "}{s.label} <button onClick={() => removeSlot(s.key)} style={{ background: "none", border: "none", color: RED.primary, cursor: "pointer", padding: 0, fontSize: 12 }}>✕</button>
+                  {s.mandatory && "★ "}{s.label} <button data-testid={`template-editor-slot-${s.key}-remove-btn`} onClick={() => removeSlot(s.key)} style={{ background: "none", border: "none", color: RED.primary, cursor: "pointer", padding: 0, fontSize: 12 }}>✕</button>
                 </span>
               ))}
             </div>
@@ -462,16 +463,16 @@ Rules:
         <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--color-border-primary)" }}>
           <div>
             {form.id && (
-              <Btn onClick={handleDelete} small style={{ background: RED.bg, color: RED.primary, borderColor: RED.border }}>
+              <Btn testId="template-editor-delete-btn" onClick={handleDelete} small style={{ background: RED.bg, color: RED.primary, borderColor: RED.border }}>
                 🗑️ Delete Template
               </Btn>
             )}
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {!form.name.trim() && form.sampleBody.trim() && <span style={{ fontSize: 12, color: AMBER.text }}>← enter a name to save</span>}
-            <Btn variant="ghost" onClick={onClose} small>Cancel</Btn>
+            <Btn testId="template-editor-cancel-btn" variant="ghost" onClick={onClose} small>Cancel</Btn>
             {/* Enabled as soon as there's body text — questions are optional; save() validates the name. */}
-            <Btn onClick={save} disabled={!form.sampleBody.trim()}>Save Template</Btn>
+            <Btn testId="template-editor-save-btn" onClick={save} disabled={!form.sampleBody.trim()}>Save Template</Btn>
           </div>
         </div>
       </div>
@@ -488,11 +489,11 @@ function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartA
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Template Library</h3>
-        {tab !== "AI" && <Btn small onClick={() => onEdit(null)}>+ New Template</Btn>}
+        {tab !== "AI" && <Btn testId="template-library-new-btn" small onClick={() => onEdit(null)}>+ New Template</Btn>}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["Public", "My Templates", "Community", "AI"].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+          <button key={t} data-testid={`template-library-tab-${t.toLowerCase().replace(/\s/g,'-')}-btn`} onClick={() => setTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
             borderColor: tab === t ? (t === "AI" ? "#5B5BDB" : PURPLE.primary) : "var(--color-border-primary)",
             background: tab === t ? (t === "AI" ? "#1E1E2E" : PURPLE.bg) : "#fff",
             color: tab === t ? (t === "AI" ? "#A5A5FF" : PURPLE.primary) : "var(--color-text-secondary)" }}>{t === "AI" ? "✨ AI Mode" : t}</button>
@@ -502,24 +503,24 @@ function TemplateLibrary({ customTemplates, onEdit, onDelete, onSelect, onStartA
         <div style={{ background: "linear-gradient(135deg,#1E1E2E,#2A1A4E)", borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: "#E0E0FF", margin: 0 }}>✨ No template? Let AI draft one.</p>
           <p style={{ fontSize: 12, color: "#9090C0", margin: 0 }}>Type the diagnosis — AI drafts a typical summary instantly; refine with photos or notes.</p>
-          <input value={aiComplaint} onChange={e => setAiComplaint(e.target.value)} placeholder="e.g. Nephrotic syndrome relapse"
+          <input data-testid="template-library-ai-complaint-input" value={aiComplaint} onChange={e => setAiComplaint(e.target.value)} placeholder="e.g. Nephrotic syndrome relapse"
             style={{ padding: "9px 12px", border: "1.5px solid #5B5BDB", borderRadius: 8, fontSize: 14, outline: "none", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
           {!hasKey && <p style={{ fontSize: 11, color: "#5050A0", margin: 0 }}>⚠ Requires an API key in ⚙️ Settings</p>}
-          <Btn disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())} style={{ background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff", alignSelf: "flex-start" }}>
+          <Btn testId="template-library-ai-draft-btn" disabled={!aiComplaint.trim() || !hasKey} onClick={() => onStartAiMode(aiComplaint.trim())} style={{ background: hasKey ? "#5B5BDB" : "#3A3A6A", color: "#fff", alignSelf: "flex-start" }}>
             {!hasKey ? "⚠ Add API Key First" : "✨ Draft it →"}
           </Btn>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10, maxHeight: 400, overflowY: "auto" }}>
           {source.map(t => (
-            <div key={t.id} onClick={() => onSelect(t)} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 10, padding: 14, cursor: "pointer" }}>
+            <div key={t.id} data-testid={`template-card-${t.id}`} onClick={() => onSelect(t)} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 10, padding: 14, cursor: "pointer" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <p style={{ fontWeight: 700, fontSize: 13, margin: "0 0 6px" }}>{t.name}</p>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <button onClick={e => { e.stopPropagation(); onEdit(t); }} title={t.source === "system" ? "Edit a copy in My Templates" : "Edit"}
+                  <button data-testid={`template-card-${t.id}-edit-btn`} onClick={e => { e.stopPropagation(); onEdit(t); }} title={t.source === "system" ? "Edit a copy in My Templates" : "Edit"}
                     style={{ fontSize: 12, background: "none", border: "none", cursor: "pointer", padding: 0 }}>✏️</button>
                   {t.source !== "system" && (
-                    <button onClick={e => {
+                    <button data-testid={`template-card-${t.id}-delete-btn`} onClick={e => {
                       e.stopPropagation();
                       if (window.confirm("Are you sure you want to delete this template? This action cannot be undone.")) {
                         onDelete(t.id);
@@ -804,8 +805,8 @@ INSTRUCTIONS:
           <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>The summary is already written — just fill the highlighted blanks (or upload photos to auto-fill)</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="secondary" small onClick={() => navigator.clipboard?.writeText(finalText())}>Copy</Btn>
-          <Btn variant="ghost" small onClick={onCancel}>Close</Btn>
+          <Btn testId="fillscreen-copy-btn" variant="secondary" small onClick={() => navigator.clipboard?.writeText(finalText())}>Copy</Btn>
+          <Btn testId="fillscreen-close-btn" variant="ghost" small onClick={onCancel}>Close</Btn>
         </div>
       </div>
 
@@ -813,7 +814,7 @@ INSTRUCTIONS:
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showUpload ? 12 : 0 }}>
           <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📷 Auto-fill {autofilling && <span style={{ fontSize: 12, color: PURPLE.primary, fontWeight: 400 }}>· reading…</span>}</h3>
-          <button onClick={() => setShowUpload(v => !v)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer" }}>{showUpload ? "Hide" : "Show"}</button>
+          <button data-testid="fillscreen-toggle-upload-btn" onClick={() => setShowUpload(v => !v)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer" }}>{showUpload ? "Hide" : "Show"}</button>
         </div>
         {showUpload && (
           <>
@@ -823,17 +824,17 @@ INSTRUCTIONS:
               …or tell it the details <span style={{ fontWeight: 400 }}>(type or 🎙 speak — e.g. "baby of Sunita, born 30 Dec at 1:16 am by LSCS, weight 3.1 kg")</span>
             </label>
             <div style={{ display: "flex", gap: 8 }}>
-              <textarea value={customInfo} onChange={e => setCustomInfo(e.target.value)}
+              <textarea data-testid="fillscreen-custom-info-textarea" value={customInfo} onChange={e => setCustomInfo(e.target.value)}
                 placeholder={voiceOn ? "Listening…" : "Patient details in your own words…"}
                 style={{ ...inputS, minHeight: 52, resize: "vertical", flex: 1, fontSize: 13 }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+                <button data-testid="fillscreen-voice-btn" onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
                   style={{ padding: "8px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
                     border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`, background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>
                   🎙 {voiceOn ? "Stop" : "Speak"}
                 </button>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <Btn variant="secondary" small onClick={() => runAutofill(customInfo)} disabled={!apiKey || autofilling || (!customInfo.trim() && !docs.some(d => d.status === "done"))} style={{ flex: "1 1 auto", whiteSpace: "nowrap" }}>
+                  <Btn testId="fillscreen-fill-blanks-btn" variant="secondary" small onClick={() => runAutofill(customInfo)} disabled={!apiKey || autofilling || (!customInfo.trim() && !docs.some(d => d.status === "done"))} style={{ flex: "1 1 auto", whiteSpace: "nowrap" }}>
                     ✨ Fill Blanks
                   </Btn>
                 </div>
@@ -848,7 +849,7 @@ INSTRUCTIONS:
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📈 Chronological Investigations Timeline</h3>
-            <Btn variant="secondary" small onClick={generateTimelineTable} disabled={generatingTimeline}>
+            <Btn testId="fillscreen-extract-timeline-btn" variant="secondary" small onClick={generateTimelineTable} disabled={generatingTimeline}>
               {generatingTimeline ? "⌛ Sorting..." : "✨ Extract Chronological Table"}
             </Btn>
           </div>
@@ -925,7 +926,7 @@ INSTRUCTIONS:
               💡 AI Assistant: Missing Clinical Details Checklist
               {checkingMissing && <span style={{ fontSize: 12, color: PURPLE.primary, fontWeight: 400, marginLeft: 8 }}>· analyzing...</span>}
             </h3>
-            <button onClick={analyzeMissingDetails} disabled={checkingMissing} 
+            <button data-testid="fillscreen-reanalyze-missing-btn" onClick={analyzeMissingDetails} disabled={checkingMissing} 
               style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer" }}>
               ↻ Re-analyze
             </button>
@@ -945,7 +946,7 @@ INSTRUCTIONS:
                     {item.options && item.options.length > 0 ? (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
                         {item.options.map(opt => (
-                          <button key={opt} onClick={() => setAssistantAnswer(item.key, opt)}
+                          <button key={opt} data-testid={`fillscreen-assistant-${item.key}-${opt}-chip`} onClick={() => setAssistantAnswer(item.key, opt)}
                             style={{ 
                               padding: "4px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                               borderColor: currentVal === opt ? PURPLE.primary : "var(--color-border-primary)", 
@@ -955,12 +956,12 @@ INSTRUCTIONS:
                             {opt}
                           </button>
                         ))}
-                        <input value={item.options.includes(currentVal) ? "" : currentVal} 
+                        <input data-testid={`fillscreen-assistant-${item.key}-custom-input`} value={item.options.includes(currentVal) ? "" : currentVal} 
                           onChange={e => setAssistantAnswer(item.key, e.target.value)}
                           placeholder="or custom..." style={{ ...inputS, fontSize: 12, width: 120, padding: "4px 8px" }} />
                       </div>
                     ) : (
-                      <input value={currentVal} onChange={e => setAssistantAnswer(item.key, e.target.value)} 
+                      <input data-testid={`fillscreen-assistant-${item.key}-input`} value={currentVal} onChange={e => setAssistantAnswer(item.key, e.target.value)} 
                         placeholder={`Enter ${item.label.toLowerCase()}...`}
                         style={{ ...inputS, fontSize: 12, padding: "6px 10px" }} />
                     )}
@@ -973,7 +974,7 @@ INSTRUCTIONS:
           )}
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            <Btn small onClick={runAiRefine} disabled={autofilling} style={{ background: PURPLE.primary }}>
+            <Btn testId="fillscreen-generate-summary-btn" small onClick={runAiRefine} disabled={autofilling} style={{ background: PURPLE.primary }}>
               {autofilling ? "✨ Generating Summary…" : "✨ Generate Summary with AI"}
             </Btn>
           </div>
@@ -996,6 +997,7 @@ INSTRUCTIONS:
       {template.slots.length > 0 && (
         <Card style={{ padding: 0, overflow: "hidden" }}>
           <button
+            data-testid="fillscreen-toggle-fillin-btn"
             onClick={() => setShowFillIn(v => !v)}
             style={{
               width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1022,17 +1024,17 @@ INSTRUCTIONS:
                     {(s.options || []).length > 0 ? (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                         {s.options.map(opt => (
-                          <button key={opt} onClick={() => setVal(s.key, opt)}
+                          <button key={opt} data-testid={`fillscreen-slot-${s.key}-${opt}-chip`} onClick={() => setVal(s.key, opt)}
                             style={{ padding: "6px 14px", borderRadius: 18, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                               borderColor: val === opt ? PURPLE.primary : "var(--color-border-primary)", background: val === opt ? PURPLE.bg : "#fff", color: val === opt ? PURPLE.primary : "var(--color-text-secondary)" }}>
                             {opt}
                           </button>
                         ))}
-                        <input value={s.options.includes(val) ? "" : val} onChange={e => setVal(s.key, e.target.value)}
+                        <input data-testid={`fillscreen-slot-${s.key}-custom-input`} value={s.options.includes(val) ? "" : val} onChange={e => setVal(s.key, e.target.value)}
                           placeholder="or type…" style={{ ...inputS, fontSize: 13, width: 140, padding: "6px 10px" }} />
                       </div>
                     ) : (
-                      <input value={val} onChange={e => setVal(s.key, e.target.value)} placeholder={s.default || s.label}
+                      <input data-testid={`fillscreen-slot-${s.key}-input`} value={val} onChange={e => setVal(s.key, e.target.value)} placeholder={s.default || s.label}
                         style={{ ...inputS, fontSize: 13, borderColor: un ? AMBER.border : "var(--color-border-primary)", background: un ? AMBER.bg : "#fff" }} />
                     )}
                   </div>
@@ -1045,10 +1047,10 @@ INSTRUCTIONS:
 
       {/* Edit full text + Save — above the summary */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <Btn variant="secondary" small onClick={() => { if (!editing) setEditText(finalText()); setEditing(v => !v); }}>
+        <Btn testId="fillscreen-toggle-edit-btn" variant="secondary" small onClick={() => { if (!editing) setEditText(finalText()); setEditing(v => !v); }}>
           {editing ? "✅ Done editing" : "✏️ Edit full text"}
         </Btn>
-        <Btn variant="secondary" small onClick={saveAsTemplate} disabled={savingTemplate}>💾 Save as new template</Btn>
+        <Btn testId="fillscreen-save-as-template-btn" variant="secondary" small onClick={saveAsTemplate} disabled={savingTemplate}>💾 Save as new template</Btn>
         {savedToast && (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#0F6E56", background: "#E1F5EE", border: "1px solid #9FE1CB", borderRadius: 20, padding: "4px 12px", animation: "fadeSlideIn 0.25s ease" }}>
             ✅ Template saved!
@@ -1068,7 +1070,7 @@ INSTRUCTIONS:
       {/* The living document (summary below) */}
       <Card style={{ padding: 20 }}>
         {editing ? (
-          <textarea value={editText} onChange={e => setEditText(e.target.value)}
+          <textarea data-testid="fillscreen-edit-full-text-textarea" value={editText} onChange={e => setEditText(e.target.value)}
             style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
         ) : (
           <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 2.1, whiteSpace: "pre-wrap", color: "var(--color-text-primary)" }}>
@@ -1079,7 +1081,7 @@ INSTRUCTIONS:
               const un = unverified.has(p.key);
               const width = Math.max((val || s.default || s.label).length, 3) + 2;
               return (
-                <input key={i} value={val} onChange={e => setVal(p.key, e.target.value)} placeholder={s.default || s.label}
+                <input key={i} data-testid={`fillscreen-inline-blank-${p.key}-input`} value={val} onChange={e => setVal(p.key, e.target.value)} placeholder={s.default || s.label}
                   title={s.label}
                   style={{ width: width + "ch", fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, textAlign: "center",
                     padding: "1px 4px", margin: "0 1px", borderRadius: 5, outline: "none",
@@ -1562,7 +1564,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             {step === 5 && "Review, edit, copy or save your final discharge summary."}
           </p>
         </div>
-        <Btn variant="ghost" small onClick={onCancel}>Exit Wizard</Btn>
+        <Btn testId="wizard-exit-btn" variant="ghost" small onClick={onCancel}>Exit Wizard</Btn>
       </div>
 
       {/* Step 1 Content */}
@@ -1570,14 +1572,14 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
         <Card style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Confirmed Diagnosis</label>
-            <input value={confirmedDiagnosis} onChange={e => setConfirmedDiagnosis(e.target.value)} style={inputS} placeholder="e.g. Neonatal Jaundice" />
+            <input data-testid="wizard-step1-diagnosis-input" value={confirmedDiagnosis} onChange={e => setConfirmedDiagnosis(e.target.value)} style={inputS} placeholder="e.g. Neonatal Jaundice" />
           </div>
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Confirmed Age</label>
-            <input value={confirmedAge} onChange={e => setConfirmedAge(e.target.value)} style={inputS} placeholder="e.g. 3 days" />
+            <input data-testid="wizard-step1-age-input" value={confirmedAge} onChange={e => setConfirmedAge(e.target.value)} style={inputS} placeholder="e.g. 3 days" />
           </div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 10 }}>
-            <Btn onClick={() => setStep(2)}>Next →</Btn>
+            <Btn testId="wizard-step1-next-btn" onClick={() => setStep(2)}>Next →</Btn>
           </div>
         </Card>
       )}
@@ -1595,7 +1597,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             ].map(item => {
               const active = summaryType === item.type;
               return (
-                <div key={item.type} onClick={() => setSummaryType(item.type)}
+                <div key={item.type} data-testid={`wizard-step2-type-${item.type}-card`} onClick={() => setSummaryType(item.type)}
                   style={{
                     border: `2px solid ${active ? PURPLE.primary : "var(--color-border-primary)"}`,
                     background: active ? PURPLE.bg : "#fff",
@@ -1613,8 +1615,8 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
           </div>
 
           <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 16 }}>
-            <Btn variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
-            <Btn onClick={() => setStep(3)}>Next →</Btn>
+            <Btn testId="wizard-step2-back-btn" variant="ghost" onClick={() => setStep(1)}>← Back</Btn>
+            <Btn testId="wizard-step2-next-btn" onClick={() => setStep(3)}>Next →</Btn>
           </div>
         </Card>
       )}
@@ -1630,10 +1632,10 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                 Doctor's Clinical / Progress Notes <span style={{ fontWeight: 400 }}>(vitals, boluses, course, exceptions)</span>
               </label>
               <div style={{ display: "flex", gap: 8 }}>
-                <textarea value={notesText} onChange={e => setNotesText(e.target.value)}
+                <textarea data-testid="wizard-step3-notes-textarea" value={notesText} onChange={e => setNotesText(e.target.value)}
                   placeholder={voiceOn ? "Listening…" : "e.g., Baby admitted with severe dehydration, fluid bolus correction given, DCT positive, FFP transfused..."}
                   style={{ ...inputS, minHeight: 100, resize: "vertical", flex: 1 }} />
-                <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+                <button data-testid="wizard-step3-voice-btn" onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
                   style={{ padding: "0 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`, background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)", flexShrink: 0 }}>
                   🎙 {voiceOn ? "Stop" : "Speak"}
                 </button>
@@ -1652,6 +1654,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                   {!compilingClinical && clinicalText && <span style={{ fontSize: 11, color: TEAL.primary }}>✓ Review and edit below</span>}
                 </div>
                 <textarea
+                  data-testid="wizard-step3-clinical-preview-textarea"
                   value={compilingClinical ? "⏳ AI is parsing uploaded documents…" : clinicalText}
                   onChange={e => setClinicalText(e.target.value)}
                   readOnly={compilingClinical}
@@ -1686,7 +1689,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                     l.replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim())
                   );
                   if (rows.length < 2) return (
-                    <textarea value={investigationsText} onChange={e => setInvestigationsText(e.target.value)}
+                    <textarea data-testid="wizard-step3-investigations-raw-textarea" value={investigationsText} onChange={e => setInvestigationsText(e.target.value)}
                       placeholder="AI-parsed investigations table will appear here after upload."
                       style={{ ...inputS, minHeight: 140, resize: "vertical", fontFamily: "monospace", fontSize: 12 }} />
                   );
@@ -1732,7 +1735,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                       </div>
                       <details style={{ marginTop: 8 }}>
                         <summary style={{ fontSize: 11, color: "var(--color-text-secondary)", cursor: "pointer" }}>✏️ Edit raw table</summary>
-                        <textarea value={investigationsText} onChange={e => setInvestigationsText(e.target.value)}
+                        <textarea data-testid="wizard-step3-investigations-edit-textarea" value={investigationsText} onChange={e => setInvestigationsText(e.target.value)}
                           style={{ ...inputS, minHeight: 100, fontFamily: "monospace", fontSize: 11, lineHeight: 1.5, marginTop: 6 }} />
                       </details>
                     </>
@@ -1743,8 +1746,8 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
           </Card>
 
           <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 10 }}>
-            <Btn variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
-            <Btn onClick={compilePatientMemory} disabled={processingIntake || compilingClinical || compilingInvestigations}>
+            <Btn testId="wizard-step3-back-btn" variant="ghost" onClick={() => setStep(2)}>← Back</Btn>
+            <Btn testId="wizard-step3-process-next-btn" onClick={compilePatientMemory} disabled={processingIntake || compilingClinical || compilingInvestigations}>
               {processingIntake ? "✨ Processing details..." : "✨ Process & Next →"}
             </Btn>
           </div>
@@ -1783,7 +1786,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                   {item.options.map(opt => {
                     const isSelected = currentVal.split("|").map(x => x.trim().toLowerCase()).includes(opt.trim().toLowerCase());
                     return (
-                      <button key={opt} onClick={() => toggleAnswerOption(item.key, opt)}
+                      <button key={opt} data-testid={`wizard-gap-${item.key}-${opt}-chip`} onClick={() => toggleAnswerOption(item.key, opt)}
                         style={{ 
                           padding: "4px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                           borderColor: isSelected ? PURPLE.primary : "var(--color-border-primary)", 
@@ -1794,7 +1797,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                       </button>
                     );
                   })}
-                  <input value={customVal} 
+                  <input data-testid={`wizard-gap-${item.key}-custom-input`} value={customVal} 
                     onChange={e => {
                       const selectedOpts = currentVal.split("|").map(x => x.trim()).filter(x => item.options.some(opt => opt.toLowerCase() === x.toLowerCase()));
                       const newCustom = e.target.value;
@@ -1804,7 +1807,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
                     placeholder="or custom..." style={{ ...inputS, fontSize: 12, width: 120, padding: "4px 8px" }} />
                 </div>
               ) : (
-                <input value={currentVal} onChange={e => setAnswers(prev => ({ ...prev, [item.key]: e.target.value }))} 
+                <input data-testid={`wizard-gap-${item.key}-input`} value={currentVal} onChange={e => setAnswers(prev => ({ ...prev, [item.key]: e.target.value }))} 
                   placeholder={`Enter ${item.label.toLowerCase()}...`}
                   style={{ ...inputS, fontSize: 12, padding: "6px 10px" }} />
               )}
@@ -1847,12 +1850,12 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             )}
 
             <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 14, borderTop: "1px solid var(--color-border-primary)", paddingTop: 14 }}>
-              <Btn variant="ghost" onClick={() => setStep(3)}>← Back</Btn>
+              <Btn testId="wizard-step4-back-btn" variant="ghost" onClick={() => setStep(3)}>← Back</Btn>
               <div style={{ display: "flex", gap: 8 }}>
-                <Btn variant="secondary" onClick={() => analyzeWizardGaps(patientMemory, answers)} disabled={checkingMissing}>
+                <Btn testId="wizard-step4-reanalyze-btn" variant="secondary" onClick={() => analyzeWizardGaps(patientMemory, answers)} disabled={checkingMissing}>
                   ↻ Re-analyze Gaps
                 </Btn>
-                <Btn onClick={() => { setStep(5); generateWizardSummary(); }} disabled={checkingMissing}>
+                <Btn testId="wizard-step4-generate-summary-btn" onClick={() => { setStep(5); generateWizardSummary(); }} disabled={checkingMissing}>
                   ✨ Generate Summary
                 </Btn>
               </div>
@@ -1868,7 +1871,7 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
             {generatingSummary ? (
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center", padding: 40 }}>✨ Writing Discharge Summary...</p>
             ) : editing ? (
-              <textarea value={summaryText} onChange={e => setSummaryText(e.target.value)}
+              <textarea data-testid="wizard-step5-edit-textarea" value={summaryText} onChange={e => setSummaryText(e.target.value)}
                 style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
             ) : (
               <pre style={{ fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap", margin: 0 }}>{summaryText}</pre>
@@ -1883,12 +1886,14 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
               </label>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <textarea 
+                  data-testid="wizard-step5-refine-prompt-textarea"
                   value={refinePrompt} 
                   onChange={e => setRefinePrompt(e.target.value)}
                   placeholder="e.g., Add a warning to avoid heavy lifting, emphasize strict rest, or rephrase clinical course..."
                   style={{ ...inputS, minHeight: 50, resize: "vertical", fontSize: 12, flex: 1, padding: "6px 10px" }}
                 />
                 <Btn 
+                  testId="wizard-step5-refine-btn"
                   small
                   disabled={generatingSummary || !refinePrompt.trim()} 
                   onClick={() => refineSummaryWithInstruction(refinePrompt)} 
@@ -1900,16 +1905,16 @@ Do NOT use any markdown bold syntax (**text**) anywhere. All labels and headings
           )}
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Btn variant="secondary" small onClick={() => setStep(4)} disabled={generatingSummary}>
+            <Btn testId="wizard-step5-adjust-details-btn" variant="secondary" small onClick={() => setStep(4)} disabled={generatingSummary}>
               ← Adjust Details (Step 4)
             </Btn>
-            <Btn variant="secondary" small onClick={() => setEditing(v => !v)} disabled={generatingSummary}>
+            <Btn testId="wizard-step5-toggle-edit-btn" variant="secondary" small onClick={() => setEditing(v => !v)} disabled={generatingSummary}>
               {editing ? "Done Editing" : "✏️ Edit Summary Text"}
             </Btn>
-            <Btn variant="secondary" small onClick={() => { navigator.clipboard?.writeText(summaryText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} disabled={generatingSummary}>
+            <Btn testId="wizard-step5-copy-btn" variant="secondary" small onClick={() => { navigator.clipboard?.writeText(summaryText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} disabled={generatingSummary}>
               {copied ? "✓ Copied!" : "Copy Summary"}
             </Btn>
-            <Btn onClick={() => setWizardSaveModal(true)} disabled={generatingSummary || !summaryText.trim()}>
+            <Btn testId="wizard-step5-save-template-btn" onClick={() => setWizardSaveModal(true)} disabled={generatingSummary || !summaryText.trim()}>
               💾 Save as Template
             </Btn>
             {wizardSavedToast && (
@@ -2012,32 +2017,32 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
           <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>Typical draft — refine only what's different</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <Btn variant="secondary" small onClick={handleCopy} disabled={loading}>{copied ? "✓ Copied!" : "Copy"}</Btn>
-          <Btn small onClick={onDone} disabled={loading}>Finish</Btn>
-          <Btn variant="ghost" small onClick={onCancel}>Cancel</Btn>
+          <Btn testId="ai-mode-copy-btn" variant="secondary" small onClick={handleCopy} disabled={loading}>{copied ? "✓ Copied!" : "Copy"}</Btn>
+          <Btn testId="ai-mode-finish-btn" small onClick={onDone} disabled={loading}>Finish</Btn>
+          <Btn testId="ai-mode-cancel-btn" variant="ghost" small onClick={onCancel}>Cancel</Btn>
         </div>
       </div>
       <Card>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 12 }}>
-          <input value={patient} onChange={e => setPatient(e.target.value)} placeholder="Patient — name, age, sex" style={inputS} />
-          <Btn small variant="secondary" onClick={() => setShowScan(v => !v)}>📷 {docs.length ? `Reports (${docs.length})` : "Scan report"}</Btn>
+          <input data-testid="ai-mode-patient-input" value={patient} onChange={e => setPatient(e.target.value)} placeholder="Patient — name, age, sex" style={inputS} />
+          <Btn testId="ai-mode-scan-toggle-btn" small variant="secondary" onClick={() => setShowScan(v => !v)}>📷 {docs.length ? `Reports (${docs.length})` : "Scan report"}</Btn>
         </div>
         {showScan && <div style={{ marginBottom: 12 }}><DocumentIntake docs={docs} setDocs={setDocs} provider={provider} apiKey={apiKey} /></div>}
         <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Anything different about this patient?</label>
         <div style={{ display: "flex", gap: 8 }}>
-          <textarea value={exceptions} onChange={e => setExceptions(e.target.value)} placeholder="e.g. one episode of melena on day 3" style={{ ...inputS, minHeight: 52, resize: "vertical", flex: 1 }} />
-          <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
+          <textarea data-testid="ai-mode-exceptions-textarea" value={exceptions} onChange={e => setExceptions(e.target.value)} placeholder="e.g. one episode of melena on day 3" style={{ ...inputS, minHeight: 52, resize: "vertical", flex: 1 }} />
+          <button data-testid="ai-mode-voice-btn" onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
             style={{ padding: "0 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`, background: voiceOn ? RED.bg : "#fff", color: voiceOn ? RED.primary : "var(--color-text-secondary)" }}>🎙 {voiceOn ? "Stop" : "Speak"}</button>
         </div>
-        <div style={{ marginTop: 10 }}><Btn small onClick={generate} disabled={loading}>{loading ? "Generating…" : "↻ Regenerate"}</Btn></div>
+        <div style={{ marginTop: 10 }}><Btn testId="ai-mode-regenerate-btn" small onClick={generate} disabled={loading}>{loading ? "Generating…" : "↻ Regenerate"}</Btn></div>
       </Card>
       <Card style={{ padding: 20 }}>
         {loading ? <p style={{ fontSize: 14, color: "var(--color-text-secondary)", textAlign: "center", padding: 40 }}>✨ Drafting…</p>
-          : error ? <div><p style={{ fontSize: 14, color: AMBER.text, margin: "0 0 12px" }}>{error}</p><Btn small onClick={generate}>Retry</Btn></div>
-          : editing ? <textarea value={text} onChange={e => setText(e.target.value)} style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
+          : error ? <div><p style={{ fontSize: 14, color: AMBER.text, margin: "0 0 12px" }}>{error}</p><Btn testId="ai-mode-retry-btn" small onClick={generate}>Retry</Btn></div>
+          : editing ? <textarea data-testid="ai-mode-edit-textarea" value={text} onChange={e => setText(e.target.value)} style={{ width: "100%", minHeight: 440, border: "none", outline: "none", fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, resize: "vertical" }} />
           : <pre style={{ fontFamily: "var(--font-mono)", fontSize: 13, lineHeight: 1.9, whiteSpace: "pre-wrap", margin: 0 }}>{text}</pre>}
       </Card>
-      {!loading && !error && <Btn variant="secondary" small onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "✏️ Edit"}</Btn>}
+      {!loading && !error && <Btn testId="ai-mode-toggle-edit-btn" variant="secondary" small onClick={() => setEditing(v => !v)}>{editing ? "Done editing" : "✏️ Edit"}</Btn>}
       {!loading && !error && <SafetyCheckPanel getText={() => text} diagnosis={complaint} provider={provider} apiKey={apiKey} />}
     </div>
   );
@@ -2089,7 +2094,7 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
               <span style={{ fontSize: 20 }}>📴</span>
               <p style={{ fontSize: 14, color: AMBER.text, margin: 0 }}>
                 <strong>No API key.</strong> Templates fill instantly by hand; photo auto-fill, AI Mode & Safety Check need a key.{" "}
-                <button onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: PURPLE.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
+                <button data-testid="supersummary-add-api-key-link" onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: PURPLE.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
               </p>
             </div>
           )}
@@ -2115,6 +2120,7 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <button 
+                data-testid="template-flow-smart-editor-btn"
                 onClick={() => {
                   setActiveTemplate(selectedTemplateForOptions);
                   setAiAssistantEnabled(false);
@@ -2132,6 +2138,7 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
               </button>
 
               <button 
+                data-testid="template-flow-ai-wizard-btn"
                 onClick={() => {
                   setActiveTemplate(selectedTemplateForOptions);
                   setAiAssistantEnabled(true);
@@ -2149,7 +2156,7 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
               </button>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
-              <Btn variant="ghost" small onClick={() => setSelectedTemplateForOptions(null)}>Cancel</Btn>
+              <Btn testId="template-flow-cancel-btn" variant="ghost" small onClick={() => setSelectedTemplateForOptions(null)}>Cancel</Btn>
             </div>
           </div>
         </div>
