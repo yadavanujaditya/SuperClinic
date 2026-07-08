@@ -3,7 +3,7 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
-import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, AppFooter } from "./HomeHero.jsx";
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -301,7 +301,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
         <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
           <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
             <strong>ClinicFlow</strong><br />
-            Built for junior doctors in Indian OPDs.<br /><br />
+            Built for doctors in Indian OPDs.<br /><br />
             All processing is local. Your patient data never leaves your device.
           </p>
         </div>
@@ -2918,6 +2918,25 @@ export default function App() {
                   </p>
                   <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
                     Play & Learn ↗
+                  </button>
+                </div>
+              </Card>
+
+              {/* Card 5: DnbProPrep — external DNB exam prep platform */}
+              <Card onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
+                <div style={{ background: "#eef2ff", borderBottom: "1px solid rgba(79, 70, 229, 0.1)" }}>
+                  <CardCarousel accent="#4f46e5" slides={[IllustDnb]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🎓</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4f46e5", margin: 0 }}>DnbProPrep</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    Focused DNB exam preparation — structured practice and review material. Opens in a new tab.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
+                    Prep for DNB ↗
                   </button>
                 </div>
               </Card>

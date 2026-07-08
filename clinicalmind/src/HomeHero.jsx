@@ -212,6 +212,22 @@ export function IllustGame() {
     </IllustBase>
   );
 }
+export function IllustDnb() {
+  return (
+    <IllustBase bg="#eef2ff">
+      <rect x="95" y="55" width="110" height="90" rx="10" fill="#fff" stroke="#4f46e5" strokeWidth="2.5" />
+      <path d="M150 55 v90" stroke="#c7d2fe" strokeWidth="2" />
+      <rect x="105" y="66" width="34" height="6" rx="3" fill="#4f46e5" />
+      <rect x="105" y="80" width="26" height="5" rx="2.5" fill="#c7d2fe" />
+      <rect x="105" y="90" width="30" height="5" rx="2.5" fill="#c7d2fe" />
+      <rect x="161" y="66" width="34" height="6" rx="3" fill="#4f46e5" />
+      <rect x="161" y="80" width="26" height="5" rx="2.5" fill="#c7d2fe" />
+      <rect x="161" y="90" width="30" height="5" rx="2.5" fill="#c7d2fe" />
+      <circle cx="150" cy="130" r="20" fill="#4f46e5" />
+      <path d="M141 130 l6 6 l12 -13" stroke="#fff" strokeWidth="3.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </IllustBase>
+  );
+}
 
 // Small auto-rotating illustration carousel used inside a card (replaces a single static image).
 export function CardCarousel({ slides, accent = "#0d9488", height = 170 }) {
@@ -245,7 +261,7 @@ export function AppFooter() {
           <span style={{ fontSize: 22 }}>⚡</span>
           <div>
             <p style={{ fontSize: 14, fontWeight: 800, margin: 0, color: "var(--color-text-primary)" }}>ClinicFlow</p>
-            <p style={{ fontSize: 11.5, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Built for junior doctors in Indian government hospitals — all processing stays on your device.</p>
+            <p style={{ fontSize: 11.5, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Built for doctors in Indian government hospitals — all processing stays on your device.</p>
           </div>
         </div>
         <a href="https://t.me/yadavanujaditya" target="_blank" rel="noopener noreferrer"
