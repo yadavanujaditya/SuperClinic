@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js";
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
-import SuperSummary from "./SuperSummary.jsx";
+import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0F6E56", light: "#1D9E75", bg: "#E1F5EE", border: "#9FE1CB", text: "#085041" };
@@ -1698,29 +1698,29 @@ function PageViewer({ docName, page, pdfBuffers, onClose }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
-        if (!window.pdfjsLib) {
-          await new Promise((res, rej) => {
-            const s = document.createElement("script");
-            s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-            s.onload = res; s.onerror = rej;
-            document.head.appendChild(s);
-          });
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-        }
         const buf = pdfBuffers?.current?.get(docName);
-        if (!buf) { setError("PDF buffer not found. Re-upload the document to enable page preview."); return; }
-        const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        if (!buf) {
+          if (active) setError("PDF buffer not found. Re-upload the document to enable page preview.");
+          return;
+        }
+        const pdf = await openPDFDoc(buf);
+        if (!active) return;
         const pg = await pdf.getPage(page);
+        if (!active) return;
         const viewport = pg.getViewport({ scale: 1.5 });
         const canvas = canvasRef.current;
+        if (!canvas) return;
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         await pg.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-      } catch (e) { setError(`Could not render page: ${e.message}`); }
+      } catch (e) {
+        if (active) setError(`Could not render page: ${e.message}`);
+      }
     })();
+    return () => { active = false; };
   }, [docName, page]);
 
   return (
@@ -1868,6 +1868,12 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
   const [customIn, setCustomIn] = useState("");
   const [weightMap, setWeightMap] = useState({});
   const [sidebar, setSidebar] = useState({ open: false, diagnosis: "", chunks: [], ms: null });
+  
+  // Discussion Mode states
+  const [discussionMode, setDiscussionMode] = useState(false);
+  const [discussionDocs, setDiscussionDocs] = useState([]);
+  const processedDocs = useRef(new Set());
+
   const histRef = useRef(null);
   const recRef = useRef(null);
   // track current state in ref so closures in handleAnswer can access latest values
@@ -1875,6 +1881,19 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
   const redFlagsRef = useRef(redFlags);
   useEffect(() => { diffsRef.current = differentials; }, [differentials]);
   useEffect(() => { redFlagsRef.current = redFlags; }, [redFlags]);
+
+  // Auto-send clinical reports to AI once uploaded and parsed
+  useEffect(() => {
+    if (!discussionMode) return;
+    const completed = discussionDocs.filter(d => d.status === "done" && !processedDocs.current.has(d.id));
+    if (completed.length === 0) return;
+    completed.forEach(d => processedDocs.current.add(d.id));
+    
+    const text = completed.map(d => `Uploaded report: ${d.name}`).join(", ");
+    const nextHist = [...history, { q: `System: Uploaded and analyzed reports: ${completed.map(c => c.name).join(", ")}`, a: "Reports attached to clinical context." }];
+    setHistory(nextHist);
+    askAI(nextHist);
+  }, [discussionDocs.map(d => `${d.id}:${d.status}`).join(",")]);
 
   useEffect(() => {
     if (complaint.clinicalContent) {
@@ -1884,7 +1903,16 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
     if (aiOnly) { askAI([]); return; }
     if (complaint.workflow?.nodes) {
       const entry = complaint.workflow.nodes.find(n => n.id === complaint.workflow.entryNode);
-      if (entry) { setNodeData(entry); setCurrentQ(entry.question); setOptions(entry.options.map(o => o.label)); return; }
+      if (entry) {
+        setNodeData(entry);
+        setCurrentQ(entry.question);
+        let entryOpts = entry.options.map(o => o.label);
+        if (entry.id && entry.id.endsWith("_handoff")) {
+          entryOpts = [...entryOpts, "💬 Discuss further with AI (upload reports & chat)"];
+        }
+        setOptions(entryOpts);
+        return;
+      }
     }
     askAI([]);
   }, []);
@@ -1905,23 +1933,56 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
       return;
     }
     setLoading(true); setError(""); setStreamText("");
+    
     const context = doRetrieval(hist);
+    const reportsText = discussionDocs.filter(d => d.status === "done" && d.ocrText).map(d => `REPORT [${d.name}]: ${d.ocrText}`).join("\n\n");
+    const combinedContext = [context, reportsText ? `UPLOADED CLINICAL REPORTS:\n${reportsText}` : ""].filter(Boolean).join("\n\n");
+
     const msgs = hist.length
       ? hist.flatMap((h, i) => [{ role: "user", content: `Q${i+1}: ${h.q}` }, { role: "assistant", content: `Answer: ${h.a}` }])
       : [];
-    msgs.push({ role: "user", content: "Generate the next clinical question." });
+
+    let systemPrompt = buildSystemPrompt(complaint.name, age, sex, combinedContext);
+    if (discussionMode) {
+      systemPrompt = `Interactive clinical discussion assistant for junior doctors, India government hospital OPD.
+Patient: ${age || "?"}y ${sex || ""}. Chief complaint: ${complaint.name}.
+
+CLINICAL REFERENCE & UPLOADED REPORTS:
+${combinedContext}
+
+Output ONLY valid JSON. No markdown. No explanation. Exactly this structure:
+{"question":"[Your response to the doctor's follow-up question or reports analysis. Keep it clinical, structured, helpful and brief.]","options":[],"differentials":[{"name":"...","likelihood":"high|medium|low","reasoning":"one line max"}],"red_flags":["..."],"done":false}
+
+Rules:
+- question: your response to the doctor's typed follow-up or report uploaded. Make sure to review the UPLOADED CLINICAL REPORTS if present!
+- options: ALWAYS return [] (empty array) in discussion mode.
+- differentials: max 5, updated and ranked based on new information, India-specific weighting.
+- red_flags: ONLY if triggered.
+- done: false.`;
+    }
+
+    if (msgs.length === 0) {
+      msgs.push({ role: "user", content: "Let's begin the clinical discussion. Summarize what we know so far." });
+    } else {
+      msgs.push({ role: "user", content: "Discuss the latest update / answer the doctor's question." });
+    }
+
     try {
       let raw = "";
-      await callAIStream(msgs, buildSystemPrompt(complaint.name, age, sex, context), provider, apiKey, t => { raw = t; setStreamText(t); });
+      await callAIStream(msgs, systemPrompt, provider, apiKey, t => { raw = t; setStreamText(t); });
       const parsed = parseJSON(raw);
       if (parsed) {
-        setCurrentQ(parsed.question || ""); setOptions(parsed.options || []);
+        setCurrentQ(parsed.question || "");
+        let nextOpts = parsed.options || [];
+        if (parsed.done && hist.length >= 9) {
+          nextOpts = [
+            "Generate note with current findings",
+            "💬 Discuss further with AI (upload reports & chat)"
+          ];
+        }
+        setOptions(nextOpts);
         if (parsed.differentials?.length) setDifferentials(parsed.differentials.slice(0, 5));
         if (parsed.red_flags?.length) setRedFlags(p => [...new Set([...p, ...parsed.red_flags])]);
-        if (parsed.done && hist.length >= 9) {
-          onNote(hist, parsed.differentials || diffsRef.current, redFlagsRef.current);
-          return;
-        }
       } else { setError("Could not parse AI response. Tap to retry."); }
     } catch (e) { setError(`${e.message}. Tap to retry.`); }
     finally { setLoading(false); setStreamText(""); setNodeData(null); }
@@ -1944,6 +2005,21 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
   };
 
   const handleAnswer = (answer, nodeOpt = null) => {
+    if (answer === "Generate note with current findings") {
+      onNote(history, differentials, redFlags);
+      return;
+    }
+    if (answer === "💬 Discuss further with AI (upload reports & chat)") {
+      setDiscussionMode(true);
+      const nextHist = [...history, { q: currentQ, a: answer }];
+      setHistory(nextHist);
+      setOptions([]);
+      setTimeout(() => {
+        askAI(nextHist);
+      }, 100);
+      return;
+    }
+
     const hist = [...history, { q: currentQ, a: answer }];
     setHistory(hist); setCustomIn(""); setVoiceTx("");
     const tags = nodeOpt?.tags || [];
@@ -1964,17 +2040,24 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
     const nextId = nodeOpt?.next;
     if (nextId === "END") {
       if (apiKey) {
-        // Key available — hand off to AI for richer follow-up after the local workflow
         askAI(hist);
       } else {
-        // No key — local workflow done, generate offline note
         onNote(hist, updatedDiffs.length ? updatedDiffs : diffsRef.current, newRedFlags);
       }
       return;
     }
     if (nextId && nextId !== "AI" && complaint.workflow?.nodes) {
       const next = complaint.workflow.nodes.find(n => n.id === nextId);
-      if (next) { setNodeData(next); setCurrentQ(next.question); setOptions(next.options.map(o => o.label)); return; }
+      if (next) {
+        setNodeData(next);
+        setCurrentQ(next.question);
+        let nextOpts = next.options.map(o => o.label);
+        if (next.id && next.id.endsWith("_handoff")) {
+          nextOpts = [...nextOpts, "💬 Discuss further with AI (upload reports & chat)"];
+        }
+        setOptions(nextOpts);
+        return;
+      }
     }
     askAI(hist);
   };
@@ -2034,7 +2117,20 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ fontSize: 18 }}>⏳</span>
                 <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>
-                  {streamText ? streamText.slice(0, 100) + "…" : "Thinking…"}
+                  {(() => {
+                    if (!streamText) return "Thinking…";
+                    try {
+                      // Attempt to parse incomplete/streaming JSON to extract the question
+                      const cleaned = streamText.replace(/```json|```/g, "").trim();
+                      // Find if we have a "question" field inside the raw stream
+                      const match = cleaned.match(/"question"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
+                      if (match && match[1]) {
+                        // Unescape double quotes and newlines
+                        return match[1].replace(/\\"/g, '"').replace(/\\n/g, '\n');
+                      }
+                    } catch (e) {}
+                    return "Thinking…";
+                  })()}
                 </p>
               </div>
             ) : error ? (
@@ -2056,12 +2152,19 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
             )}
           </Card>
 
+          {discussionMode && (
+            <div style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 14, border: "1px solid var(--color-border-primary)" }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>📑 Upload Case Reports / Photos to Discuss</label>
+              <DocumentIntake docs={discussionDocs} setDocs={setDiscussionDocs} provider={provider} apiKey={apiKey} />
+            </div>
+          )}
+
           {!loading && !error && options.map((opt, i) => (
             <OptionButton key={i} label={opt} onClick={() => handleAnswer(opt, nodeData?.options?.find(o => o.label === opt))} />
           ))}
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <button onClick={voiceOn ? () => { recRef.current?.stop(); setVoiceOn(false); } : startVoice}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
                   border: `1.5px solid ${voiceOn ? RED.primary : "var(--color-border-primary)"}`,
@@ -2075,6 +2178,11 @@ function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tag
                     border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary }}>
                   Use this →
                 </button>
+              )}
+              {discussionMode && (
+                <Btn small style={{ marginLeft: "auto" }} onClick={() => onNote(history, differentials, redFlags)}>
+                  Generate Note ({history.length} items) →
+                </Btn>
               )}
             </div>
             {(voiceOn || voiceTx) && (

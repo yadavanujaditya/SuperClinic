@@ -206,13 +206,63 @@ export async function callVisionOCR(imageDataURL, provider, apiKey) {
 
 export function parseJSON(raw) {
   if (!raw) return null;
-  // Strip markdown code fences
   let text = raw.replace(/```json\s*/gi, "").replace(/```\s*/gi, "").trim();
-  // Try direct parse
+  
   try { return JSON.parse(text); } catch (_) {}
-  // Extract the first complete JSON object from anywhere in the text
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) { try { return JSON.parse(match[0]); } catch (_) {} }
+
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    try { return JSON.parse(braceMatch[0]); } catch (_) {}
+  }
+
+  try {
+    const cleaned = braceMatch ? braceMatch[0] : text;
+    const qMatch = cleaned.match(/"question"\s*:\s*"([\s\S]*?)"\s*(?:,|\})/);
+    
+    let options = [];
+    const optMatch = cleaned.match(/"options"\s*:\s*\[([\s\S]*?)\]/);
+    if (optMatch && optMatch[1]) {
+      options = optMatch[1].split(",")
+        .map(s => s.trim().replace(/^"|"$/g, "").replace(/^'|'$/g, "").trim())
+        .filter(Boolean);
+    }
+    
+    let differentials = [];
+    const diffMatch = cleaned.match(/"differentials"\s*:\s*\[([\s\S]*?)\]/);
+    if (diffMatch && diffMatch[1]) {
+      const rawObjs = diffMatch[1].match(/\{[\s\S]*?\}/g) || [];
+      differentials = rawObjs.map(o => {
+        try { return JSON.parse(o); } catch (__) {
+          const nMatch = o.match(/"name"\s*:\s*"([\s\S]*?)"/);
+          const lMatch = o.match(/"likelihood"\s*:\s*"([\s\S]*?)"/);
+          if (nMatch) return { name: nMatch[1], likelihood: lMatch ? lMatch[1] : "low", reasoning: "" };
+          return null;
+        }
+      }).filter(Boolean);
+    }
+    
+    let red_flags = [];
+    const rfMatch = cleaned.match(/"red_flags"\s*:\s*\[([\s\S]*?)\]/);
+    if (rfMatch && rfMatch[1]) {
+      red_flags = rfMatch[1].split(",")
+        .map(s => s.trim().replace(/^"|"$/g, "").replace(/^'|'$/g, "").trim())
+        .filter(Boolean);
+    }
+    
+    const doneMatch = cleaned.match(/"done"\s*:\s*(true|false)/i);
+    const done = doneMatch ? doneMatch[1].toLowerCase() === "true" : false;
+
+    if (qMatch && qMatch[1]) {
+      return {
+        question: qMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n'),
+        options,
+        differentials,
+        red_flags,
+        done
+      };
+    }
+  } catch (___) {}
+
   return null;
 }
 
