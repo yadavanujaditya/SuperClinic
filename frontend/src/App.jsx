@@ -4,6 +4,7 @@ import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, bui
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
+import { useAuth } from "./AuthContext.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -1081,33 +1082,40 @@ function ProductToggle({ product, setProduct }) {
 
 // ─── Profile Modal ────────────────────────────────────────────────────────────
 function ProfileModal({ onClose, onSettings }) {
+  const { user, logout } = useAuth();
+  const professionLabels = { mbbs_student: "MBBS Student", resident: "Resident", consultant: "Consultant" };
   return (
     <div data-testid="profile-modal-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
         <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
           <button data-testid="profile-modal-close-btn" onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
-          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+          {user?.picture ? (
+            <img src={user.picture} alt="" style={{ width: 76, height: 76, borderRadius: "50%", margin: "0 auto", display: "block", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", objectFit: "cover" }} />
+          ) : (
+            <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+          )}
         </div>
         <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
           <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", padding: 18, textAlign: "center" }}>
-            <p style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>Attending Doctor</p>
-            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>Indian Government Hospital OPD</p>
+            <p data-testid="profile-modal-user-name" style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>{user?.name || "Doctor"}</p>
+            <p data-testid="profile-modal-user-email" style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>{user?.email}</p>
+            {user?.role === "admin" && <span style={{ display: "inline-block", marginTop: 6, fontSize: 10, fontWeight: 700, color: "#fff", background: PURPLE.primary, padding: "2px 8px", borderRadius: 10 }}>ADMIN</span>}
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <div style={{ flex: 1, background: TEAL.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🔒</p>
-              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>On-device only</p>
+              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🩺</p>
+              <p data-testid="profile-modal-profession" style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>{professionLabels[user?.profession] || "Profession"}</p>
             </div>
             <div style={{ flex: 1, background: PURPLE.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>⚡</p>
-              <p style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>v1.0 ClinicFlow</p>
+              <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>📱</p>
+              <p data-testid="profile-modal-mobile" style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>{user?.mobile_number || "No number"}</p>
             </div>
           </div>
-          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
-            No account needed — your patient data and API keys never leave this device.
-          </p>
           <button data-testid="profile-modal-open-settings-btn" onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             ⚙️ Open Settings
+          </button>
+          <button data-testid="profile-modal-logout-btn" onClick={() => { onClose(); logout(); }} style={{ width: "100%", marginTop: 8, padding: "11px", borderRadius: 10, border: "1.5px solid #fecdd3", background: "#fff", color: "#e11d48", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            🚪 Log Out
           </button>
         </div>
       </div>
