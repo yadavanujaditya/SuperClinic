@@ -86,27 +86,31 @@ async def ai_status(user=Depends(get_current_user)):
 
 # ── Streaming chat proxy — uses admin-configured key server-side ───────────
 async def _stream_claude(messages, system, api_key, model) -> AsyncGenerator[bytes, None]:
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream(
-            "POST", "https://api.anthropic.com/v1/messages",
-            headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": api_key},
-            json={"model": model, "max_tokens": 4096, "stream": True, "system": system, "messages": messages},
-        ) as res:
-            if res.status_code != 200:
-                body = await res.aread()
-                raise HTTPException(status_code=502, detail=f"Claude API {res.status_code}: {body.decode(errors='ignore')}")
-            async for line in res.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                data = line[6:].strip()
-                if not data:
-                    continue
-                try:
-                    ev = json.loads(data)
-                    if ev.get("type") == "content_block_delta" and ev.get("delta", {}).get("type") == "text_delta":
-                        yield ev["delta"]["text"].encode()
-                except (json.JSONDecodeError, KeyError):
-                    continue
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST", "https://api.anthropic.com/v1/messages",
+                headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": api_key},
+                json={"model": model, "max_tokens": 4096, "stream": True, "system": system, "messages": messages},
+            ) as res:
+                if res.status_code != 200:
+                    body = await res.aread()
+                    yield f"__AI_STREAM_ERROR__:Claude API {res.status_code}: {body.decode(errors='ignore')[:300]}".encode()
+                    return
+                async for line in res.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if not data:
+                        continue
+                    try:
+                        ev = json.loads(data)
+                        if ev.get("type") == "content_block_delta" and ev.get("delta", {}).get("type") == "text_delta":
+                            yield ev["delta"]["text"].encode()
+                    except (json.JSONDecodeError, KeyError):
+                        continue
+    except httpx.HTTPError as e:
+        yield f"__AI_STREAM_ERROR__:Claude network error: {e}".encode()
 
 
 async def _stream_gemini(messages, system, api_key, model) -> AsyncGenerator[bytes, None]:
@@ -119,51 +123,59 @@ async def _stream_gemini(messages, system, api_key, model) -> AsyncGenerator[byt
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={api_key}"
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream("POST", url, headers={"Content-Type": "application/json"}, json=body) as res:
-            if res.status_code != 200:
-                text = await res.aread()
-                raise HTTPException(status_code=502, detail=f"Gemini API {res.status_code}: {text.decode(errors='ignore')}")
-            async for line in res.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                data = line[6:].strip()
-                if not data or data == "[DONE]":
-                    continue
-                try:
-                    ev = json.loads(data)
-                    parts = ev.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                    for part in parts:
-                        if not part.get("thought") and part.get("text"):
-                            yield part["text"].encode()
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    continue
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream("POST", url, headers={"Content-Type": "application/json"}, json=body) as res:
+                if res.status_code != 200:
+                    text = await res.aread()
+                    yield f"__AI_STREAM_ERROR__:Gemini API {res.status_code}: {text.decode(errors='ignore')[:300]}".encode()
+                    return
+                async for line in res.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        ev = json.loads(data)
+                        parts = ev.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+                        for part in parts:
+                            if not part.get("thought") and part.get("text"):
+                                yield part["text"].encode()
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        continue
+    except httpx.HTTPError as e:
+        yield f"__AI_STREAM_ERROR__:Gemini network error: {e}".encode()
 
 
 async def _stream_openai_compat(messages, system, api_key, model, base_url) -> AsyncGenerator[bytes, None]:
     full_messages = ([{"role": "system", "content": system}] if system else []) + messages
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        async with client.stream(
-            "POST", f"{base_url}/chat/completions",
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-            json={"model": model, "max_tokens": 4096, "stream": True, "messages": full_messages},
-        ) as res:
-            if res.status_code != 200:
-                text = await res.aread()
-                raise HTTPException(status_code=502, detail=f"API {res.status_code}: {text.decode(errors='ignore')}")
-            async for line in res.aiter_lines():
-                if not line.startswith("data: "):
-                    continue
-                data = line[6:].strip()
-                if not data or data == "[DONE]":
-                    continue
-                try:
-                    ev = json.loads(data)
-                    text = ev.get("choices", [{}])[0].get("delta", {}).get("content")
-                    if text:
-                        yield text.encode()
-                except (json.JSONDecodeError, KeyError, IndexError):
-                    continue
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            async with client.stream(
+                "POST", f"{base_url}/chat/completions",
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                json={"model": model, "max_tokens": 4096, "stream": True, "messages": full_messages},
+            ) as res:
+                if res.status_code != 200:
+                    text = await res.aread()
+                    yield f"__AI_STREAM_ERROR__:API {res.status_code}: {text.decode(errors='ignore')[:300]}".encode()
+                    return
+                async for line in res.aiter_lines():
+                    if not line.startswith("data: "):
+                        continue
+                    data = line[6:].strip()
+                    if not data or data == "[DONE]":
+                        continue
+                    try:
+                        ev = json.loads(data)
+                        text = ev.get("choices", [{}])[0].get("delta", {}).get("content")
+                        if text:
+                            yield text.encode()
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        continue
+    except httpx.HTTPError as e:
+        yield f"__AI_STREAM_ERROR__:API network error: {e}".encode()
 
 
 @router.post("/ai/chat/stream")

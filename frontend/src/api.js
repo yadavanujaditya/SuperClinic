@@ -32,6 +32,9 @@ export async function callAIStream(messages, system, provider, apiKey, onDelta) 
     const { done, value } = await reader.read();
     if (done) break;
     full += dec.decode(value, { stream: true });
+    if (full.startsWith("__AI_STREAM_ERROR__:")) {
+      throw new Error(full.slice("__AI_STREAM_ERROR__:".length));
+    }
     onDelta?.(full);
   }
   return full;
