@@ -101,7 +101,7 @@ export default function HomeHero() {
           {/* dots */}
           <div style={{ display: "flex", gap: 8, marginTop: 24, alignItems: "center" }}>
             {SLIDES.map((_, n) => (
-              <span key={n} onClick={() => go(n)} className="hero-dot"
+              <span key={n} data-testid={`hero-dot-${n}`} onClick={() => go(n)} className="hero-dot"
                 style={{ height: 8, width: n === i ? 26 : 8, borderRadius: 8, background: n === i ? "#fff" : "rgba(255,255,255,0.45)" }} />
             ))}
             <span style={{ marginLeft: 10, fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: 600 }}>{i + 1} / {SLIDES.length}</span>
@@ -255,7 +255,7 @@ export function CardCarousel({ slides, accent = "#0d9488", height = 170 }) {
 // ─── Footer ─────────────────────────────────────────────────────────────────────
 export function AppFooter() {
   return (
-    <footer style={{ marginTop: 48, borderTop: "1px solid var(--color-border-primary)", background: "#fff" }}>
+    <footer data-testid="app-footer" style={{ marginTop: 48, borderTop: "1px solid var(--color-border-primary)", background: "#fff" }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "32px 20px", display: "flex", flexWrap: "wrap", gap: 24, alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>⚡</span>
@@ -264,7 +264,7 @@ export function AppFooter() {
             <p style={{ fontSize: 11.5, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Built for doctors in Indian government hospitals — all processing stays on your device.</p>
           </div>
         </div>
-        <a href="https://t.me/yadavanujaditya" target="_blank" rel="noopener noreferrer"
+        <a data-testid="app-footer-telegram-link" href="https://t.me/yadavanujaditya" target="_blank" rel="noopener noreferrer"
           className="lift-on-hover"
           style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", padding: "10px 18px", borderRadius: 30,
             background: "linear-gradient(120deg,#2AABEE,#229ED9)", color: "#fff", fontWeight: 700, fontSize: 13.5, boxShadow: "0 8px 20px rgba(34,158,217,0.28)" }}>

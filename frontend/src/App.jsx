@@ -26,7 +26,7 @@ function apiKeyFor(provider) { return localStorage.getItem(`clinicalmind:apikey:
 function saveApiKey(provider, key) { localStorage.setItem(`clinicalmind:apikey:${provider}`, key); }
 
 // ─── Shared components ────────────────────────────────────────────────────────
-function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {} }) {
+function Btn({ children, onClick, variant = "primary", disabled, small, style: s = {}, testId, ...rest }) {
   const base = {
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
     borderRadius: 8, fontFamily: "var(--font-sans)", cursor: disabled ? "not-allowed" : "pointer",
@@ -39,7 +39,7 @@ function Btn({ children, onClick, variant = "primary", disabled, small, style: s
     ghost:     { background: "transparent", color: "var(--color-text-secondary)", border: `1.5px solid var(--color-border-primary)` },
     danger:    { background: RED.primary, color: "#fff" },
   };
-  return <button style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled}>{children}</button>;
+  return <button data-testid={testId} style={{ ...base, ...variants[variant], ...s }} onClick={onClick} disabled={disabled} {...rest}>{children}</button>;
 }
 
 function Badge({ children, color = TEAL }) {
@@ -204,7 +204,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Settings</h2>
-          <button onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+          <button data-testid="settings-close-btn" onClick={onClose} style={{ fontSize: 20, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer" }}>✕</button>
         </div>
 
         {/* Provider selector */}
@@ -212,7 +212,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>AI Provider</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {PROVIDERS.map(pr => (
-              <button key={pr.id} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
+              <button key={pr.id} data-testid={`settings-provider-${pr.id}-btn`} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-sans)",
                   border: `1.5px solid ${provider === pr.id ? TEAL.primary : "var(--color-border-primary)"}`,
                   background: provider === pr.id ? TEAL.bg : "#fff", color: provider === pr.id ? TEAL.primary : "var(--color-text-primary)" }}>
@@ -229,19 +229,19 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
             API Key — {p.name}
           </label>
           <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <input type={showKey ? "text" : "password"} value={draft} onChange={e => setDraft(e.target.value)}
+            <input data-testid="settings-api-key-input" type={showKey ? "text" : "password"} value={draft} onChange={e => setDraft(e.target.value)}
               placeholder={p.keyHint}
               style={{ ...inputS, flex: 1, border: `1.5px solid ${draft && !valid ? RED.border : "var(--color-border-primary)"}` }} />
-            <button onClick={() => setShowKey(v => !v)}
+            <button data-testid="settings-show-hide-key-btn" onClick={() => setShowKey(v => !v)}
               style={{ padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 13, cursor: "pointer", background: "#fff", fontFamily: "var(--font-sans)" }}>
               {showKey ? "Hide" : "Show"}
             </button>
           </div>
-          {draft && !valid && <p style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
-          {saved && <p style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
-          <Btn onClick={save} disabled={!valid} small>Save Key</Btn>
+          {draft && !valid && <p data-testid="settings-key-invalid-msg" style={{ fontSize: 12, color: RED.primary, margin: "0 0 8px" }}>Key must start with {p.keyPrefix}</p>}
+          {saved && <p data-testid="settings-key-saved-msg" style={{ fontSize: 12, color: TEAL.primary, margin: "0 0 8px" }}>✓ Saved successfully</p>}
+          <Btn testId="settings-save-key-btn" onClick={save} disabled={!valid} small>Save Key</Btn>
           {draft && apiKeyFor(provider) && (
-            <button onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
+            <button data-testid="settings-remove-key-btn" onClick={() => { saveApiKey(provider, ""); setDraft(""); setCurrentKey(""); }}
               style={{ marginLeft: 10, fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
               Remove key
             </button>
@@ -255,6 +255,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Generic Mode Instructions</label>
             <textarea
+              data-testid="settings-generic-instructions-textarea"
               value={genericInst}
               onChange={e => setGenericInst(e.target.value)}
               rows={8}
@@ -265,6 +266,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Detailed Mode Instructions</label>
             <textarea
+              data-testid="settings-detailed-instructions-textarea"
               value={detailedInst}
               onChange={e => setDetailedInst(e.target.value)}
               rows={8}
@@ -273,8 +275,9 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Btn onClick={saveInstructions} small>Save Instructions</Btn>
+            <Btn testId="settings-save-instructions-btn" onClick={saveInstructions} small>Save Instructions</Btn>
             <button
+              data-testid="settings-reset-instructions-btn"
               onClick={() => {
                 if (window.confirm("Are you sure you want to reset instructions to default?")) {
                   localStorage.removeItem("clinicalmind:instructions:generic");
@@ -350,10 +353,10 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
       <div style={{ width: 180, flexShrink: 0, display: "flex", flexDirection: "column", gap: 6, overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>NODES</span>
-          <button onClick={addNode} style={{ fontSize: 12, fontWeight: 700, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>+ Add</button>
+          <button data-testid="workflow-add-node-btn" onClick={addNode} style={{ fontSize: 12, fontWeight: 700, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>+ Add</button>
         </div>
         {nodes.map(n => (
-          <div key={n.id} onClick={() => setSelectedId(n.id)}
+          <div key={n.id} data-testid={`workflow-node-${n.id}-item`} onClick={() => setSelectedId(n.id)}
             style={{ padding: "8px 10px", borderRadius: 8, cursor: "pointer", border: `1.5px solid ${selectedId === n.id ? TEAL.primary : "var(--color-border-primary)"}`,
               background: selectedId === n.id ? TEAL.bg : "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4 }}>
@@ -374,7 +377,7 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>NODE ID</label>
-                <input style={{ ...iS, fontFamily: "var(--font-mono)", width: 140 }} value={selected.id}
+                <input data-testid="workflow-node-id-input" style={{ ...iS, fontFamily: "var(--font-mono)", width: 140 }} value={selected.id}
                   onChange={e => {
                     const newId = e.target.value.replace(/\s/g, "_");
                     // Update all references to this id in other nodes' options
@@ -389,12 +392,12 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "flex-end", paddingBottom: 1 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>
-                  <input type="checkbox" checked={entryNode === selected.id}
+                  <input data-testid="workflow-entry-node-checkbox" type="checkbox" checked={entryNode === selected.id}
                     onChange={() => onChange({ nodes, entryNode: selected.id })}
                     style={{ marginRight: 4 }} />
                   Entry node
                 </label>
-                <button onClick={() => removeNode(selected.id)}
+                <button data-testid="workflow-delete-node-btn" onClick={() => removeNode(selected.id)}
                   style={{ fontSize: 12, color: RED.primary, background: RED.bg, border: `1px solid ${RED.border}`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                   Delete node
                 </button>
@@ -403,14 +406,14 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
 
             <div>
               <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>QUESTION</label>
-              <textarea style={{ ...iS, minHeight: 60, resize: "vertical" }} value={selected.question}
+              <textarea data-testid="workflow-question-textarea" style={{ ...iS, minHeight: 60, resize: "vertical" }} value={selected.question}
                 onChange={e => updateNode(selected.id, { question: e.target.value })} />
             </div>
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-secondary)" }}>OPTIONS ({selected.options.length})</label>
-                <button onClick={() => addOption(selected.id)}
+                <button data-testid="workflow-add-option-btn" onClick={() => addOption(selected.id)}
                   style={{ fontSize: 12, color: TEAL.primary, background: TEAL.bg, border: `1px solid ${TEAL.border}`, borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                   + Option
                 </button>
@@ -419,15 +422,15 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
                 {selected.options.map((opt, i) => (
                   <div key={i} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <input style={{ ...iS, flex: 1 }} value={opt.label} placeholder="Option label"
+                      <input data-testid={`workflow-option-${i}-label-input`} style={{ ...iS, flex: 1 }} value={opt.label} placeholder="Option label"
                         onChange={e => updateOption(selected.id, i, { label: e.target.value })} />
-                      <button onClick={() => removeOption(selected.id, i)}
+                      <button data-testid={`workflow-option-${i}-remove-btn`} onClick={() => removeOption(selected.id, i)}
                         style={{ fontSize: 14, color: RED.primary, background: "none", border: "none", cursor: "pointer", padding: "0 4px", flexShrink: 0 }}>✕</button>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>NEXT NODE</label>
-                        <select style={{ ...iS, borderColor: opt.next === "END" && nodes.length > 1 ? AMBER.border : undefined }} value={opt.next}
+                        <select data-testid={`workflow-option-${i}-next-select`} style={{ ...iS, borderColor: opt.next === "END" && nodes.length > 1 ? AMBER.border : undefined }} value={opt.next}
                           onChange={e => updateOption(selected.id, i, { next: e.target.value })}>
                           <option value="END">END (finish consultation)</option>
                           <option value="AI">AI (call AI for next Q)</option>
@@ -439,19 +442,19 @@ function WorkflowEditor({ nodes, entryNode, onChange }) {
                       </div>
                       <div>
                         <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>TAGS (comma-sep)</label>
-                        <input style={iS} value={(opt.tags || []).join(", ")} placeholder="e.g. rigors, chills"
+                        <input data-testid={`workflow-option-${i}-tags-input`} style={iS} value={(opt.tags || []).join(", ")} placeholder="e.g. rigors, chills"
                           onChange={e => updateOption(selected.id, i, { tags: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <label style={{ fontSize: 11, fontWeight: 600, color: RED.text, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                        <input type="checkbox" checked={!!opt.redFlag}
+                        <input data-testid={`workflow-option-${i}-redflag-checkbox`} type="checkbox" checked={!!opt.redFlag}
                           onChange={e => updateOption(selected.id, i, { redFlag: e.target.checked })} />
                         🚨 Red flag
                       </label>
                     </div>
                     {opt.redFlag && (
-                      <input style={{ ...iS, fontSize: 12, borderColor: RED.border }} value={opt.redFlagMessage || ""}
+                      <input data-testid={`workflow-option-${i}-redflag-message-input`} style={{ ...iS, fontSize: 12, borderColor: RED.border }} value={opt.redFlagMessage || ""}
                         placeholder="Red flag message shown to doctor…"
                         onChange={e => updateOption(selected.id, i, { redFlagMessage: e.target.value })} />
                     )}
@@ -529,7 +532,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{complaint ? `Edit: ${complaint.name}` : "Create New Complaint"}</h2>
-          <button onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+          <button data-testid="complaint-editor-close-btn" onClick={onClose} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
         </div>
 
         {complaint?.source === "system" && (
@@ -547,7 +550,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
         {/* Tabs */}
         <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "1.5px solid var(--color-border-primary)", paddingBottom: 0 }}>
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
+            <button key={t.id} data-testid={`complaint-editor-tab-${t.id}-btn`} onClick={() => setTab(t.id)}
               style={{ padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", border: "none", fontFamily: "var(--font-sans)",
                 borderBottom: tab === t.id ? `2.5px solid ${TEAL.primary}` : "2.5px solid transparent",
                 background: "none", color: tab === t.id ? TEAL.primary : "var(--color-text-secondary)", marginBottom: -1.5 }}>
@@ -561,33 +564,33 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Complaint Name</label>
-              <input style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Fever with Cough" />
+              <input data-testid="complaint-editor-name-input" style={inputS} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Fever with Cough" />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Category</label>
-                <select style={inputS} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                <select data-testid="complaint-editor-category-select" style={inputS} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
                   {CATEGORIES.slice(1).map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Age Group</label>
-                <select style={inputS} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
+                <select data-testid="complaint-editor-age-group-select" style={inputS} value={form.ageGroup} onChange={e => setForm(f => ({ ...f, ageGroup: e.target.value }))}>
                   {["all","pediatric","neonatal","adult"].map(a => <option key={a}>{a}</option>)}
                 </select>
               </div>
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Red Flag Keywords <span style={{ fontWeight: 400, fontSize: 12 }}>(comma-separated — triggers alert if patient mentions these)</span></label>
-              <input style={inputS} value={rfInput} onChange={e => setRfInput(e.target.value)} placeholder="e.g. petechiae, neck stiff, cyanosis" />
+              <input data-testid="complaint-editor-redflags-input" style={inputS} value={rfInput} onChange={e => setRfInput(e.target.value)} placeholder="e.g. petechiae, neck stiff, cyanosis" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Common Differentials <span style={{ fontWeight: 400, fontSize: 12 }}>(comma-separated — shown in sidebar)</span></label>
-              <input style={inputS} value={diffInput} onChange={e => setDiffInput(e.target.value)} placeholder="e.g. Malaria, Dengue, Typhoid" />
+              <input data-testid="complaint-editor-differentials-input" style={inputS} value={diffInput} onChange={e => setDiffInput(e.target.value)} placeholder="e.g. Malaria, Dengue, Typhoid" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Tags</label>
-              <input style={inputS} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="e.g. fever, rash" />
+              <input data-testid="complaint-editor-tags-input" style={inputS} value={tagInput} onChange={e => setTagInput(e.target.value)} placeholder="e.g. fever, rash" />
             </div>
             <div>
               <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
@@ -600,7 +603,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   {tagLibrary.map(t => {
                     const on = tagRefs.includes(t.id);
                     return (
-                      <button key={t.id} type="button"
+                      <button key={t.id} type="button" data-testid={`complaint-editor-tagref-${t.id}-toggle`}
                         onClick={() => setTagRefs(prev => on ? prev.filter(id => id !== t.id) : [...prev, t.id])}
                         style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 20, cursor: "pointer", fontFamily: "var(--font-sans)",
                           border: `1.5px solid ${on ? TEAL.primary : "var(--color-border-primary)"}`,
@@ -619,7 +622,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                 <div style={{ background: "var(--color-background-secondary)", borderRadius: 8, padding: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
                   <div style={{ flex: 1, minWidth: 110 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>NEW TAG LABEL</label>
-                    <input style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagLabel} onChange={e => setNewTagLabel(e.target.value)}
+                    <input data-testid="complaint-editor-new-tag-label-input" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagLabel} onChange={e => setNewTagLabel(e.target.value)}
                       placeholder="e.g. Fever" list="complaint-editor-tag-labels" />
                     <datalist id="complaint-editor-tag-labels">
                       {tagLibrary.map(t => <option key={t.id} value={t.label} />)}
@@ -627,15 +630,15 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   </div>
                   <div style={{ minWidth: 140 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>PDF</label>
-                    <select style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagDoc} onChange={e => setNewTagDoc(e.target.value)}>
+                    <select data-testid="complaint-editor-new-tag-doc-select" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagDoc} onChange={e => setNewTagDoc(e.target.value)}>
                       {pdfDocs.filter(d => d.isPdf).map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
                     </select>
                   </div>
                   <div style={{ width: 70 }}>
                     <label style={{ fontSize: 10, fontWeight: 700, color: "var(--color-text-secondary)", display: "block", marginBottom: 3 }}>PAGE</label>
-                    <input type="number" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagPage} onChange={e => setNewTagPage(e.target.value)} min={1} />
+                    <input data-testid="complaint-editor-new-tag-page-input" type="number" style={{ ...inputS, padding: "7px 10px", fontSize: 13 }} value={newTagPage} onChange={e => setNewTagPage(e.target.value)} min={1} />
                   </div>
-                  <button type="button" onClick={createInlineTag} disabled={newTagBusy || !newTagLabel.trim() || !newTagPage}
+                  <button data-testid="complaint-editor-new-tag-add-btn" type="button" onClick={createInlineTag} disabled={newTagBusy || !newTagLabel.trim() || !newTagPage}
                     style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: newTagBusy ? "default" : "pointer", border: "none",
                       background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)", opacity: (!newTagLabel.trim() || !newTagPage) ? 0.5 : 1 }}>
                     {newTagBusy ? "Adding…" : "+ Add Tag"}
@@ -656,7 +659,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
               <div style={{ textAlign: "center", padding: "40px 20px" }}>
                 <p style={{ fontSize: 32, marginBottom: 10 }}>🌳</p>
                 <p style={{ fontSize: 14, color: "var(--color-text-secondary)", marginBottom: 16 }}>No workflow yet. Add your first question node to get started.</p>
-                <Btn onClick={() => {
+                <Btn testId="complaint-editor-create-first-node-btn" onClick={() => {
                   const id = "q1";
                   setWorkflow({ nodes: [{ id, question: "First question?", options: [{ label: "Yes", next: "END", tags: [] }, { label: "No", next: "END", tags: [] }] }], entryNode: id });
                 }}>+ Create First Node</Btn>
@@ -682,12 +685,12 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: TEAL.text, display: "block", marginBottom: 4 }}>↑ INCREASE TAGS (comma-sep)</label>
-                      <input style={inputS} value={(w.tags_increase || []).join(", ")} placeholder="e.g. rigors, chills"
+                      <input data-testid={`weights-${diag}-increase-input`} style={inputS} value={(w.tags_increase || []).join(", ")} placeholder="e.g. rigors, chills"
                         onChange={e => setDiffWeights(dw => ({ ...dw, [diag]: { ...w, tags_increase: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))} />
                     </div>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: RED.text, display: "block", marginBottom: 4 }}>↓ DECREASE TAGS (comma-sep)</label>
-                      <input style={inputS} value={(w.tags_decrease || []).join(", ")} placeholder="e.g. rash, bleeding"
+                      <input data-testid={`weights-${diag}-decrease-input`} style={inputS} value={(w.tags_decrease || []).join(", ")} placeholder="e.g. rash, bleeding"
                         onChange={e => setDiffWeights(dw => ({ ...dw, [diag]: { ...w, tags_decrease: e.target.value.split(",").map(s => s.trim()).filter(Boolean) } }))} />
                     </div>
                   </div>
@@ -706,7 +709,7 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
             <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>
               Clinical Reference Content <span style={{ fontWeight: 400, fontSize: 12 }}>(BM25-indexed — used as AI context and for the diagnosis sidebar)</span>
             </label>
-            <textarea className="premium-textarea" style={{ minHeight: 320, resize: "vertical" }}
+            <textarea data-testid="complaint-editor-content-textarea" className="premium-textarea" style={{ minHeight: 320, resize: "vertical" }}
               value={form.clinicalContent}
               onChange={e => setForm(f => ({ ...f, clinicalContent: e.target.value }))}
               placeholder="Paste clinical reference text here — differentials, red flags, investigations, treatment. Plain text is fine." />
@@ -715,13 +718,13 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
 
         {/* Footer */}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--color-border-primary)", flexWrap: "wrap" }}>
-          <Btn variant="ghost" onClick={onClose} small>Cancel</Btn>
-          <Btn variant="secondary" small onClick={() => {
+          <Btn testId="complaint-editor-cancel-btn" variant="ghost" onClick={onClose} small>Cancel</Btn>
+          <Btn testId="complaint-editor-export-json-btn" variant="secondary" small onClick={() => {
             const data = { ...form, redFlagKeywords: rfInput.split(",").map(s => s.trim()).filter(Boolean), workflow };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
             const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${form.name || "complaint"}.json`; a.click();
           }}>Export JSON</Btn>
-          <Btn onClick={save} disabled={!form.name}>Save as Private</Btn>
+          <Btn testId="complaint-editor-save-btn" onClick={save} disabled={!form.name}>Save as Private</Btn>
         </div>
       </div>
     </div>
@@ -799,6 +802,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
           <button 
+            data-testid="supermemory-manage-books-btn"
             onClick={() => setExpanded(true)}
             style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${PURPLE.border}`, background: PURPLE.bg, color: PURPLE.primary, cursor: "pointer", fontFamily: "var(--font-sans)" }}
           >
@@ -806,6 +810,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
           </button>
           {totalTags > 0 && (
             <button 
+              data-testid="supermemory-view-tag-library-btn"
               onClick={onOpenTagLibrary}
               style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 8, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)" }}
             >
@@ -821,27 +826,27 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ fontSize: 15, fontWeight: 800, color: PURPLE.primary, display: "inline-flex", alignItems: "center", gap: 6 }}>✨ SuperMemory</h3>
-        <button onClick={() => setExpanded(false)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>Collapse ✕</button>
+        <button data-testid="supermemory-collapse-btn" onClick={() => setExpanded(false)} style={{ fontSize: 12, fontWeight: 600, color: PURPLE.primary, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-sans)" }}>Collapse ✕</button>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>Manage your medical books and protocol library</p>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           {tagLibrary.length > 0 && (
-            <button onClick={onOpenTagLibrary} style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, background: "none", border: "none", cursor: "pointer" }}>📚 Tag Library ({tagLibrary.length})</button>
+            <button data-testid="document-vault-tag-library-btn" onClick={onOpenTagLibrary} style={{ fontSize: 12, fontWeight: 600, color: TEAL.primary, background: "none", border: "none", cursor: "pointer" }}>📚 Tag Library ({tagLibrary.length})</button>
           )}
           {pdfDocs.length > 0 && (
-            <button onClick={() => { setPdfDocs([]); setTagLibrary([]); pdfBuffers.current.clear(); idx.clear(); }}
+            <button data-testid="document-vault-clear-all-btn" onClick={() => { setPdfDocs([]); setTagLibrary([]); pdfBuffers.current.clear(); idx.clear(); }}
               style={{ fontSize: 12, color: RED.primary, background: "none", border: "none", cursor: "pointer" }}>Clear all</button>
           )}
         </div>
       </div>
-      <div onDrop={e => { e.preventDefault(); setDragging(false); Array.from(e.dataTransfer.files).forEach(processFile); }}
+      <div data-testid="document-vault-dropzone" onDrop={e => { e.preventDefault(); setDragging(false); Array.from(e.dataTransfer.files).forEach(processFile); }}
         onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}
         onClick={() => fileRef.current?.click()}
         style={{ border: `2px dashed ${dragging ? TEAL.primary : "var(--color-border-secondary)"}`, borderRadius: 10,
           padding: "20px 16px", textAlign: "center", cursor: "pointer",
           background: dragging ? TEAL.bg : "var(--color-background-secondary)", transition: "all 0.15s" }}>
-        <input ref={fileRef} type="file" multiple accept=".txt,.md,.pdf" style={{ display: "none" }}
+        <input data-testid="document-vault-file-input" ref={fileRef} type="file" multiple accept=".txt,.md,.pdf" style={{ display: "none" }}
           onChange={e => { Array.from(e.target.files).forEach(processFile); e.target.value = ""; }} />
         {loading ? <p style={{ fontSize: 13, color: TEAL.primary, margin: 0 }}>Loading {loading}…</p> : (
           <>
@@ -852,7 +857,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
         )}
       </div>
       {pdfDocs.map((doc, i) => (
-        <div key={i} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div key={i} data-testid={`document-vault-doc-${i}-item`} style={{ background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-primary)", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</p>
@@ -861,18 +866,18 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
                 {doc.parsed && <span style={{ marginLeft: 6, color: TEAL.primary, fontWeight: 600 }}>· {doc.chunks} chunks indexed</span>}
               </p>
             </div>
-            <button onClick={() => removeDoc(doc.name)}
+            <button data-testid={`document-vault-doc-${i}-remove-btn`} onClick={() => removeDoc(doc.name)}
               style={{ fontSize: 14, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 8 }}>✕</button>
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {doc.isPdf && (
-              <button onClick={() => onOpenReader(doc)}
+              <button data-testid={`document-vault-doc-${i}-open-reader-btn`} onClick={() => onOpenReader(doc)}
                 style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: `1.5px solid ${TEAL.border}`, background: TEAL.bg, color: TEAL.primary, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                 📖 Open Reader
               </button>
             )}
             {doc.isPdf && !doc.parsed && (
-              <button onClick={() => parseDoc(doc)} disabled={parsing === doc.name}
+              <button data-testid={`document-vault-doc-${i}-parse-btn`} onClick={() => parseDoc(doc)} disabled={parsing === doc.name}
                 style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--color-border-primary)", background: "#fff", color: "var(--color-text-secondary)", cursor: "pointer", fontFamily: "var(--font-sans)", opacity: parsing === doc.name ? 0.6 : 1 }}>
                 {parsing === doc.name ? "Parsing…" : "🔍 Parse for BM25 search"}
               </button>
@@ -883,7 +888,7 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, paddingTop: 2 }}>
               {tagLibrary.flatMap(t =>
                 t.sources.filter(s => s.docName === doc.name).map(s => (
-                  <button key={`${t.id}-${s.page}`} onClick={() => onOpenReader(doc, s.page)}
+                  <button key={`${t.id}-${s.page}`} data-testid={`document-vault-tag-${t.id}-p${s.page}-btn`} onClick={() => onOpenReader(doc, s.page)}
                     style={{ fontSize: 11, fontWeight: 600, padding: "3px 9px", borderRadius: 6, border: "1.5px solid #B3D4F5", background: "#E8F4FF", color: "#1A5C9A", cursor: "pointer", fontFamily: "var(--font-sans)" }}>
                     📖 {t.label} p.{s.page}
                   </button>
@@ -902,13 +907,13 @@ function ComplaintCard({ complaint, selected, onEdit, onSelect }) {
   const [hov, setHov] = useState(false);
   const hasWorkflow = !!complaint.workflow;
   return (
-    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+    <div data-testid={`complaint-card-${complaint.id}`} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: selected ? TEAL.bg : "#fff", border: `1.5px solid ${selected ? TEAL.primary : hov ? TEAL.border : "var(--color-border-primary)"}`,
         borderRadius: 10, padding: 12, transition: "all 0.15s", cursor: "pointer" }}
       onClick={onSelect}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: hasWorkflow ? TEAL.primary : AMBER.primary, flexShrink: 0, marginTop: 4 }} />
-        <button onClick={e => { e.stopPropagation(); onEdit(); }}
+        <button data-testid={`complaint-card-${complaint.id}-edit-btn`} onClick={e => { e.stopPropagation(); onEdit(); }}
           style={{ fontSize: 13, color: "var(--color-text-secondary)", background: "none", border: "none", cursor: "pointer", padding: 2 }}>✏️</button>
       </div>
       <p style={{ fontWeight: 600, fontSize: 13, color: "var(--color-text-primary)", margin: "0 0 6px", lineHeight: 1.4 }}>{complaint.name}</p>
@@ -948,11 +953,11 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0, color: TEAL.primary }}>Complaint Library</h3>
-        {tab !== "AI" && <Btn small onClick={() => onEdit(null)}>+ New</Btn>}
+        {tab !== "AI" && <Btn testId="complaint-library-new-btn" small onClick={() => onEdit(null)}>+ New</Btn>}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {["System","Private","Community","AI"].map(t => (
-          <button key={t} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+          <button key={t} data-testid={`complaint-library-tab-${t.toLowerCase()}-btn`} onClick={() => handleTab(t)} style={{ padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
             borderColor: tab === t ? (t === "AI" ? "#A855F7" : TEAL.primary) : "var(--color-border-primary)",
             background: tab === t ? (t === "AI" ? "linear-gradient(120deg,#4c1d95,#7c3aed)" : TEAL.bg) : "#fff",
             boxShadow: tab === t && t === "AI" ? "0 3px 10px rgba(124,58,237,0.35)" : "none",
@@ -987,6 +992,7 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>📁 Select System / Category</label>
             <input 
+              data-testid="complaint-library-mobile-category-input"
               value={cat === "All" ? "" : cat} 
               onChange={e => setCat(e.target.value.trim() ? e.target.value : "All")}
               placeholder="Type to search system (e.g. GI, Neuro)..."
@@ -1001,6 +1007,7 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 12, fontWeight: 700, color: "var(--color-text-secondary)" }}>🩺 Search & Select Complaint</label>
             <input 
+              data-testid="complaint-library-mobile-search-input"
               value={search} 
               onChange={e => {
                 const val = e.target.value;
@@ -1018,7 +1025,7 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
           </div>
 
           {selected && (
-            <div style={{ background: TEAL.bg, border: `1.5px solid ${TEAL.border}`, borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fadeSlideIn 0.2s ease" }}>
+            <div data-testid="complaint-library-mobile-selected-badge" style={{ background: TEAL.bg, border: `1.5px solid ${TEAL.border}`, borderRadius: 10, padding: 12, display: "flex", justifyContent: "space-between", alignItems: "center", animation: "fadeSlideIn 0.2s ease" }}>
               <div>
                 <span style={{ fontSize: 10, fontWeight: 800, color: TEAL.primary }}>SELECTED COMPLAINT</span>
                 <p style={{ fontSize: 14, fontWeight: 700, margin: "2px 0 0", color: TEAL.text }}>{selected.name}</p>
@@ -1029,11 +1036,11 @@ function ComplaintLibrary({ selected, setSelected, onEdit, customComplaints, onM
         </div>
       ) : (
         <>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search complaints…"
+          <input data-testid="complaint-library-search-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search complaints…"
             style={{ padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)" }} />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {CATEGORIES.map(c => (
-              <button key={c} onClick={() => setCat(c)} style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+              <button key={c} data-testid={`complaint-library-category-${c.toLowerCase()}-chip`} onClick={() => setCat(c)} style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                 borderColor: cat === c ? TEAL.primary : "var(--color-border-primary)", background: cat === c ? TEAL.primary : "#fff", color: cat === c ? "#fff" : "var(--color-text-secondary)" }}>
                 {c}
               </button>
@@ -1062,7 +1069,7 @@ function ProductToggle({ product, setProduct }) {
   return (
     <div style={{ display: "flex", gap: 3, background: "var(--color-background-secondary)", borderRadius: 20, padding: 3 }}>
       {opts.map(o => (
-        <button key={o.id} onClick={() => setProduct(o.id)}
+        <button key={o.id ?? "home"} data-testid={`product-toggle-${o.id ?? "home"}-btn`} onClick={() => setProduct(o.id)}
           style={{ padding: "6px 14px", borderRadius: 18, fontSize: 13, fontWeight: 700, cursor: "pointer", border: "none", fontFamily: "var(--font-sans)",
             background: product === o.id ? o.bg : "transparent", color: product === o.id ? o.color : "var(--color-text-secondary)" }}>
           {o.label}
@@ -1075,10 +1082,10 @@ function ProductToggle({ product, setProduct }) {
 // ─── Profile Modal ────────────────────────────────────────────────────────────
 function ProfileModal({ onClose, onSettings }) {
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
+    <div data-testid="profile-modal-overlay" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
       <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
         <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
-          <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
+          <button data-testid="profile-modal-close-btn" onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
           <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
         </div>
         <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
@@ -1099,7 +1106,7 @@ function ProfileModal({ onClose, onSettings }) {
           <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
             No account needed — your patient data and API keys never leave this device.
           </p>
-          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          <button data-testid="profile-modal-open-settings-btn" onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             ⚙️ Open Settings
           </button>
         </div>
@@ -1127,7 +1134,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen(v => !v)}
+      <button data-testid="profile-menu-avatar-btn" onClick={() => setOpen(v => !v)}
         style={{ width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
         🧑‍⚕️
@@ -1135,16 +1142,16 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", borderRadius: 12,
           border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 200, overflow: "hidden", zIndex: 60 }}>
-          <button onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
+          <button data-testid="profile-menu-view-profile-item" onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
             <span>👤 View Profile</span>
           </button>
           <div style={{ height: 1, background: "var(--color-border-primary)" }} />
-          <button onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
+          <button data-testid="profile-menu-tag-library-item" onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
             <span>📚 Tag Library</span>
             {tagCount > 0 && <span style={{ fontSize: 11, background: TEAL.bg, color: TEAL.primary, padding: "1px 7px", borderRadius: 10, fontWeight: 700 }}>{tagCount}</span>}
           </button>
           <div style={{ height: 1, background: "var(--color-border-primary)" }} />
-          <button onClick={() => { setOpen(false); onSettings(); }} style={itemS}>
+          <button data-testid="profile-menu-settings-item" onClick={() => { setOpen(false); onSettings(); }} style={itemS}>
             <span>⚙️ Settings</span>
           </button>
         </div>
@@ -1243,7 +1250,7 @@ Return ONLY valid JSON with this exact structure:
   };
 
   return (
-    <div style={{ minHeight: "100vh" }}>
+    <div data-testid="library-screen" style={{ minHeight: "100vh" }}>
       <div className="hero-band" style={{ padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 20px rgba(13,148,136,0.25)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🩺</span>
@@ -1273,7 +1280,7 @@ Return ONLY valid JSON with this exact structure:
             ) : (
               <p style={{ fontSize: 14, color: "var(--color-text-secondary)", margin: 0 }}>
                 <strong style={{ color: "var(--color-text-primary)" }}>Offline mode.</strong> All 10 complaints run fully without an API key — structured local workflow + offline note.{" "}
-                <button onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
+                <button data-testid="library-add-api-key-link" onClick={() => setSettingsOpen(true)} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 14, padding: 0 }}>Add API key →</button>
               </p>
             )}
           </div>
@@ -1294,7 +1301,7 @@ Return ONLY valid JSON with this exact structure:
           {isAiMode ? (
             <div style={{ flex: 1, minWidth: 220 }}>
               <label style={{ fontSize: 13, fontWeight: 600, color: "#9090C0", display: "block", marginBottom: 4 }}>Chief Complaint</label>
-              <input value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
+              <input data-testid="library-ai-complaint-input" value={aiComplaintText} onChange={e => setAiComplaintText(e.target.value)}
                 placeholder="e.g. Fever for 3 days, Abdominal pain…"
                 style={{ padding: "9px 12px", border: "1.5px solid #8B5CF6", borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: "100%", background: "rgba(255,255,255,0.07)", color: "#E0E0FF", boxSizing: "border-box" }} />
             </div>
@@ -1311,10 +1318,10 @@ Return ONLY valid JSON with this exact structure:
           <div>
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Patient Age</label>
             <div style={{ display: "flex", gap: 6 }}>
-              <input type="number" min={0} value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
+              <input type="number" min={0} data-testid="library-age-input" value={ageValue} onChange={e => setAgeValue(e.target.value)} placeholder="e.g. 6"
                 style={{ padding: "9px 12px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", width: 80,
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }} />
-              <select value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
+              <select data-testid="library-age-unit-select" value={ageUnit} onChange={e => setAgeUnit(e.target.value)}
                 style={{ padding: "9px 10px", border: `1.5px solid ${isAiMode ? "#8B5CF6" : "var(--color-border-primary)"}`, borderRadius: 8, fontSize: 14, outline: "none", fontFamily: "var(--font-sans)", cursor: "pointer",
                   background: isAiMode ? "rgba(255,255,255,0.07)" : "#fff", color: isAiMode ? "#E0E0FF" : "inherit" }}>
                 <option value="years">Years</option>
@@ -1329,7 +1336,7 @@ Return ONLY valid JSON with this exact structure:
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 4 }}>Sex</label>
             <div style={{ display: "flex", gap: 6 }}>
               {["Male","Female","Other"].map(s => (
-                <button key={s} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
+                <button key={s} data-testid={`library-sex-${s.toLowerCase()}-btn`} onClick={() => setSex(s)} style={{ padding: "9px 14px", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", border: "1.5px solid", fontFamily: "var(--font-sans)",
                   borderColor: sex === s ? (isAiMode ? "#8B5CF6" : TEAL.primary) : (isAiMode ? "#3A3A6A" : "var(--color-border-primary)"),
                   background: sex === s ? (isAiMode ? "#2A2A5E" : TEAL.bg) : (isAiMode ? "rgba(255,255,255,0.04)" : "#fff"),
                   color: sex === s ? (isAiMode ? "#D8B4FE" : TEAL.primary) : (isAiMode ? "#7070A0" : "var(--color-text-secondary)") }}>
@@ -1344,6 +1351,7 @@ Return ONLY valid JSON with this exact structure:
             <label style={{ fontSize: 13, fontWeight: 600, color: isAiMode ? "#9090C0" : "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>Consultation Mode</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div 
+                data-testid="library-consult-mode-learning-card"
                 onClick={() => setConsultMode("learning")}
                 style={{
                   padding: 12, borderRadius: 10, cursor: "pointer", border: "1.5px solid",
@@ -1367,6 +1375,7 @@ Return ONLY valid JSON with this exact structure:
               </div>
 
               <div 
+                data-testid="library-consult-mode-opd-card"
                 onClick={() => {
                   if (hasKey) {
                     setConsultMode("opd");
@@ -1400,6 +1409,7 @@ Return ONLY valid JSON with this exact structure:
           {/* Start button */}
           {isAiMode ? (
             <Btn
+              testId="library-start-ai-consultation-btn"
               disabled={!aiComplaintText.trim() || !age || !hasKey}
               onClick={() => onStart({
                 complaint: { id: "ai_" + Date.now(), name: aiComplaintText.trim(), category: "General", source: "ai", clinicalContent: "", commonDifferentials: [], redFlagKeywords: [], tags: [] },
@@ -1409,7 +1419,7 @@ Return ONLY valid JSON with this exact structure:
               {!hasKey ? "⚠ Add API Key First" : "✨ Start AI Consultation →"}
             </Btn>
           ) : (
-            <Btn disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false, opdMode: consultMode === "opd" })} style={{ padding: "11px 28px", fontSize: 15 }}>
+            <Btn testId="library-start-consultation-btn" disabled={!selected || !age} onClick={() => onStart({ complaint: selected, age, sex, aiOnly: false, opdMode: consultMode === "opd" })} style={{ padding: "11px 28px", fontSize: 15 }}>
               Start Consultation →
             </Btn>
           )}
@@ -1622,35 +1632,35 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
     <div style={{ position: "fixed", inset: 0, background: "#0D1117", zIndex: 500, display: "flex", flexDirection: "column" }}>
       {/* Top bar */}
       <div style={{ background: "#161B22", borderBottom: "1px solid #21262D", padding: "10px 16px", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
-        <button onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "#8B949E", flexShrink: 0 }}>✕</button>
+        <button data-testid="pdf-reader-close-btn" onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "#8B949E", flexShrink: 0 }}>✕</button>
         <p style={{ fontSize: 13, fontWeight: 600, color: "#E6EDF3", margin: 0, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>📖 {docName}</p>
 
         {/* Page navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <button onClick={() => goTo(1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>«</button>
-          <button onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>‹</button>
-          <input type="number" value={currentPage} min={1} max={numPages}
+          <button data-testid="pdf-reader-first-page-btn" onClick={() => goTo(1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>«</button>
+          <button data-testid="pdf-reader-prev-page-btn" onClick={() => goTo(currentPage - 1)} disabled={currentPage <= 1} style={{ ...btnS(false), padding: "5px 10px" }}>‹</button>
+          <input data-testid="pdf-reader-page-input" type="number" value={currentPage} min={1} max={numPages}
             onChange={e => { const v = parseInt(e.target.value); if (v >= 1 && v <= numPages) setCurrentPage(v); }}
             style={{ width: 56, textAlign: "center", padding: "5px 6px", borderRadius: 6, border: "1px solid #30363D", background: "#0D1117", color: "#E6EDF3", fontSize: 13, fontFamily: "var(--font-mono)", outline: "none" }} />
           <span style={{ color: "#6E7681", fontSize: 12 }}>/ {numPages}</span>
-          <button onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>›</button>
-          <button onClick={() => goTo(numPages)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>»</button>
+          <button data-testid="pdf-reader-next-page-btn" onClick={() => goTo(currentPage + 1)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>›</button>
+          <button data-testid="pdf-reader-last-page-btn" onClick={() => goTo(numPages)} disabled={currentPage >= numPages} style={{ ...btnS(false), padding: "5px 10px" }}>»</button>
         </div>
 
         {/* Zoom */}
-        <select value={scale} onChange={e => setScale(Number(e.target.value))}
+        <select data-testid="pdf-reader-zoom-select" value={scale} onChange={e => setScale(Number(e.target.value))}
           style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #30363D", background: "#0D1117", color: "#E6EDF3", fontSize: 12, cursor: "pointer" }}>
           {[0.75, 1, 1.25, 1.5, 1.75, 2].map(s => <option key={s} value={s}>{Math.round(s * 100)}%</option>)}
         </select>
 
-        <button onClick={() => { setShowTagPanel(v => !v); setTagLabel(""); setTagPages(""); }}
+        <button data-testid="pdf-reader-tag-toggle-btn" onClick={() => { setShowTagPanel(v => !v); setTagLabel(""); setTagPages(""); }}
           style={{ ...btnS(showTagPanel), borderColor: showTagPanel ? TEAL.border : "#2D3748" }}>
           🏷 Tag
         </button>
         {onOpenTagLibrary && (
-          <button onClick={onOpenTagLibrary} style={btnS(false)}>📚 Tag Library</button>
+          <button data-testid="pdf-reader-tag-library-btn" onClick={onOpenTagLibrary} style={btnS(false)}>📚 Tag Library</button>
         )}
-        <button onClick={() => toggleSelect(currentPage)}
+        <button data-testid="pdf-reader-add-to-selection-btn" onClick={() => toggleSelect(currentPage)}
           style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)",
             border: `1.5px solid ${selectedPages.has(currentPage) ? "#6E40C9" : "#2D3748"}`,
             background: selectedPages.has(currentPage) ? "#21183A" : "#1A202C",
@@ -1658,7 +1668,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
           {selectedPages.has(currentPage) ? "✓ In selection" : "+ Add to selection"}
         </button>
         {selectedPages.size > 0 && (
-          <button onClick={() => onCreateComplaint([...selectedPages].sort((a, b) => a - b), pdfDoc, docName)}
+          <button data-testid="pdf-reader-create-complaint-btn" onClick={() => onCreateComplaint([...selectedPages].sort((a, b) => a - b), pdfDoc, docName)}
             style={{ padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", border: "none", background: "#6E40C9", color: "#fff" }}>
             ✨ Create Complaint ({selectedPages.size}p) →
           </button>
@@ -1670,7 +1680,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
         <div className="pdf-sidebar-left" style={{ background: "#0D1117", borderRight: "1px solid #21262D", padding: "14px 12px", overflowY: "auto" }}>
           <div style={{ display: "flex", gap: 4, marginBottom: 12, flexShrink: 0 }}>
             {[["chapters", "Chapters"], ["search", "🔍 Search"]].map(([id, label]) => (
-              <button key={id} onClick={() => setLeftTab(id)}
+              <button key={id} data-testid={`pdf-reader-lefttab-${id}-btn`} onClick={() => setLeftTab(id)}
                 style={{ flex: 1, fontSize: 12, fontWeight: 600, padding: "6px 8px", borderRadius: 6, border: "none", cursor: "pointer", fontFamily: "var(--font-sans)",
                   background: leftTab === id ? "#1A2E3D" : "transparent", color: leftTab === id ? "#58A6FF" : "#8B949E" }}>
                 {label}
@@ -1686,7 +1696,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {chapters.map((c, i) => (
-                  <button key={i} disabled={c.page == null} onClick={() => goTo(c.page)}
+                  <button key={i} data-testid={`pdf-reader-chapter-${i}-btn`} disabled={c.page == null} onClick={() => goTo(c.page)}
                     style={{ textAlign: "left", fontSize: 12, padding: "5px 8px", paddingLeft: 8 + c.depth * 12, borderRadius: 6, border: "none", cursor: c.page == null ? "default" : "pointer",
                       background: c.page === currentPage ? "#1A2E3D" : "transparent",
                       color: c.page == null ? "#3D4451" : c.page === currentPage ? "#58A6FF" : "#8B949E",
@@ -1699,11 +1709,11 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, minHeight: 0 }}>
               <div style={{ display: "flex", gap: 6 }}>
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                <input data-testid="pdf-reader-search-input" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") runSearch(); }}
                   placeholder="Search this book…" autoFocus
                   style={{ flex: 1, padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 13, background: "#161B22", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
-                <button onClick={runSearch} disabled={!searchQuery.trim() || !!indexProgress}
+                <button data-testid="pdf-reader-search-go-btn" onClick={runSearch} disabled={!searchQuery.trim() || !!indexProgress}
                   style={{ padding: "7px 12px", borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none", background: TEAL.primary, color: "#fff", fontFamily: "var(--font-sans)", opacity: !searchQuery.trim() ? 0.5 : 1 }}>
                   Go
                 </button>
@@ -1720,7 +1730,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               )}
               <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                 {searchResults?.map(r => (
-                  <button key={r.page} onClick={() => goTo(r.page)}
+                  <button key={r.page} data-testid={`pdf-reader-search-result-p${r.page}-btn`} onClick={() => goTo(r.page)}
                     style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "1px solid #21262D", cursor: "pointer", background: r.page === currentPage ? "#1A2E3D" : "#161B22", fontFamily: "var(--font-sans)" }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: "#58A6FF", margin: "0 0 3px" }}>p.{r.page} <span style={{ color: "#6E7681", fontWeight: 400 }}>· {r.count} match{r.count !== 1 ? "es" : ""}</span></p>
                     <p style={{ fontSize: 11, color: "#8B949E", margin: 0, lineHeight: 1.4 }}>
@@ -1751,7 +1761,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                 <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", color: "#8B949E", fontSize: 13, background: "rgba(13,17,23,0.8)", padding: "8px 16px", borderRadius: 8, zIndex: 2 }}>Rendering…</div>
               )}
               <div style={{ position: "relative", lineHeight: 0 }}>
-                <canvas ref={canvasRef}
+                <canvas data-testid="pdf-reader-canvas" ref={canvasRef}
                   onMouseDown={onCanvasMouseDown} onMouseMove={onCanvasMouseMove} onMouseUp={onCanvasMouseUp} onMouseLeave={onCanvasMouseUp}
                   style={{ borderRadius: 4, boxShadow: "0 12px 40px rgba(0,0,0,0.7)", maxWidth: "100%", cursor: tagMode === "region" && showTagPanel ? "crosshair" : "default" }} />
                 {tagMode === "region" && showTagPanel && dragRect && (
@@ -1773,7 +1783,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
 
               <div style={{ display: "flex", gap: 4 }}>
                 {[["page", "Whole page"], ["region", "Select area"]].map(([id, label]) => (
-                  <button key={id} onClick={() => { setTagMode(id); setDragRect(null); setDragStart(null); }}
+                  <button key={id} data-testid={`pdf-reader-tagmode-${id}-btn`} onClick={() => { setTagMode(id); setDragRect(null); setDragStart(null); }}
                     style={{ flex: 1, fontSize: 11, fontWeight: 600, padding: "6px 4px", borderRadius: 6, cursor: "pointer", fontFamily: "var(--font-sans)",
                       border: `1px solid ${tagMode === id ? "#A78BFA" : "#30363D"}`,
                       background: tagMode === id ? "#21183A" : "transparent", color: tagMode === id ? "#A78BFA" : "#8B949E" }}>
@@ -1782,7 +1792,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                 ))}
               </div>
 
-              <input value={tagLabel} onChange={e => setTagLabel(e.target.value)} placeholder="Label, e.g. Fever" list="tag-library-labels"
+              <input data-testid="pdf-reader-tag-label-input" value={tagLabel} onChange={e => setTagLabel(e.target.value)} placeholder="Label, e.g. Fever" list="tag-library-labels"
                 style={{ padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 13, background: "#0D1117", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
               <datalist id="tag-library-labels">
                 {tagLibrary.map(t => <option key={t.id} value={t.label} />)}
@@ -1790,7 +1800,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               <p style={{ fontSize: 10, color: "#484F58", margin: 0 }}>Reuse an existing tag name to add this page under it, from any PDF.</p>
 
               {tagMode === "page" ? (
-                <input value={tagPages} onChange={e => setTagPages(e.target.value)} placeholder={`Pages (blank = current p.${currentPage})`}
+                <input data-testid="pdf-reader-tag-pages-input" value={tagPages} onChange={e => setTagPages(e.target.value)} placeholder={`Pages (blank = current p.${currentPage})`}
                   style={{ padding: "7px 10px", border: "1px solid #30363D", borderRadius: 6, fontSize: 12, background: "#0D1117", color: "#E6EDF3", fontFamily: "var(--font-sans)", outline: "none" }} />
               ) : (
                 <p style={{ fontSize: 11, color: dragRect ? "#A78BFA" : "#6E7681", margin: 0 }}>
@@ -1798,7 +1808,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                 </p>
               )}
 
-              <button onClick={saveTag} disabled={savingTag || (tagMode === "region" && (!dragRect || dragRect.w < 4))}
+              <button data-testid="pdf-reader-save-tag-btn" onClick={saveTag} disabled={savingTag || (tagMode === "region" && (!dragRect || dragRect.w < 4))}
                 style={{ padding: "7px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", background: TEAL.primary, color: "#fff", border: "none", fontFamily: "var(--font-sans)",
                   opacity: (tagMode === "region" && (!dragRect || dragRect.w < 4)) ? 0.5 : 1 }}>
                 {savingTag ? "Saving…" : "Save Tag (auto-extracts image + text)"}
@@ -1814,7 +1824,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               : currentTags.map((t, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0D1117", borderRadius: 6, marginBottom: 4 }}>
                   <span style={{ fontSize: 12, color: "#58A6FF", fontWeight: 600 }}>🏷 {t.label}</span>
-                  <button onClick={() => onRemoveTagSource(t.id, docName, currentPage)}
+                  <button data-testid={`pdf-reader-currentpage-tag-${i}-remove-btn`} onClick={() => onRemoveTagSource(t.id, docName, currentPage)}
                     style={{ fontSize: 11, color: "#E24B4A", background: "none", border: "none", cursor: "pointer" }}>✕</button>
                 </div>
               ))
@@ -1831,7 +1841,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
                   <p style={{ fontSize: 12, fontWeight: 600, color: "#E6EDF3", margin: "0 0 5px" }}>{t.label}</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {t.sources.filter(s => s.docName === docName).map(s => (
-                      <button key={s.page} onClick={() => goTo(s.page)}
+                      <button key={s.page} data-testid={`pdf-reader-alltags-${t.id}-p${s.page}-btn`} onClick={() => goTo(s.page)}
                         style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${currentPage === s.page ? TEAL.primary : "#30363D"}`,
                           background: currentPage === s.page ? TEAL.bg : "#0D1117", color: currentPage === s.page ? TEAL.primary : "#8B949E", cursor: "pointer", fontFamily: "var(--font-mono)" }}>
                         p.{s.page}
@@ -1849,13 +1859,13 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
               <p style={{ fontSize: 11, fontWeight: 700, color: "#6E7681", margin: "0 0 6px", letterSpacing: 0.5 }}>SELECTED PAGES</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
                 {[...selectedPages].sort((a, b) => a - b).map(p => (
-                  <button key={p} onClick={() => toggleSelect(p)}
+                  <button key={p} data-testid={`pdf-reader-selected-p${p}-btn`} onClick={() => toggleSelect(p)}
                     style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #6E40C9", background: "#21183A", color: "#A78BFA", cursor: "pointer" }}>
                     p.{p} ✕
                   </button>
                 ))}
               </div>
-              <button onClick={() => setSelectedPages(new Set())}
+              <button data-testid="pdf-reader-clear-selection-btn" onClick={() => setSelectedPages(new Set())}
                 style={{ fontSize: 11, color: "#6E7681", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", fontFamily: "var(--font-sans)" }}>
                 Clear selection
               </button>
@@ -1882,12 +1892,12 @@ function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, on
         <div style={{ width: 260, borderRight: "1px solid var(--color-border-primary)", overflowY: "auto", flexShrink: 0 }}>
           <div style={{ padding: "16px 16px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>📚 Tag Library</p>
-            <button onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
+            <button data-testid="tag-library-modal-close-btn" onClick={onClose} style={{ fontSize: 18, background: "none", border: "none", cursor: "pointer", color: "var(--color-text-secondary)" }}>✕</button>
           </div>
           {tagLibrary.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", padding: "0 16px" }}>No tags yet. Open a PDF reader and tag some pages.</p>
           ) : tagLibrary.map(t => (
-            <div key={t.id} onClick={() => setSelectedId(t.id)}
+            <div key={t.id} data-testid={`tag-library-modal-tag-${t.id}-item`} onClick={() => setSelectedId(t.id)}
               style={{ padding: "10px 16px", cursor: "pointer", borderLeft: `3px solid ${selectedId === t.id ? TEAL.primary : "transparent"}`,
                 background: selectedId === t.id ? TEAL.bg : "transparent", display: "flex", gap: 10, alignItems: "center" }}>
               {t.sources[0]?.image && (
