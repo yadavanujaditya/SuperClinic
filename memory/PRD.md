@@ -104,7 +104,82 @@ All remaining phases from the original 9-point request are now complete and test
   `adityasonofashok@gmail.com` and add a real provider key via Profile → Settings before AI
   generation (chat/vision) will work end-to-end. Local/offline note generation works without it.
 
+## [Jul 2026] Mobile CSS fixes, public home page, SuperMemory persistence — IMPLEMENTED
+User reported 5 issues after using the deployed app; all fixed and verified via testing_agent_v4
+(iteration_8.json — 100% pass, 0 blocking bugs).
+
+1. **Mobile ConsultationScreen layout collapse (bug):** root cause was a CSS Grid auto-row-sizing
+   conflict — `.consultation-sidebar`'s mobile override (`overflow-y:visible`) forced its full
+   content height into the grid's row sizing, while the main question/options column (inline
+   `overflow-y:auto`) was allowed to collapse toward 0 to compensate, squeezing the question and
+   options into an unreadably small box. Fixed by letting the whole `.consultation-root` grow
+   (`height:auto;min-height:100vh`) with a `position:sticky` header, and making the grid rows
+   (`.consultation-layout`, `.consultation-main`, `.consultation-sidebar`) all `overflow:visible`
+   on mobile so the page scrolls naturally as one flow instead of nesting nested scroll regions.
+2. **Public home page (feature):** `AuthGate` (`AuthScreens.jsx`) no longer blocks guests — it only
+   gates onboarding for logged-in users missing profession/mobile. Guests see the home page (hero +
+   workspace cards) with a "Sign In" pill instead of an avatar. Clicking any feature card
+   (ClinicFlow/SuperSummary/SuperMemory/MoProPrep/DnbProPrep) calls a new `requireAuth()` helper in
+   `App.jsx` — if logged in, proceeds; if not, opens a non-blocking `<LoginModal>` overlay
+   (`AuthScreens.jsx`) instead of a full-page redirect. After signing up/in inline, the guest must
+   click the card again (no auto-resume of the pending action — by design, kept simple).
+3. **"Our Other Apps" section (feature):** MoProPrep and DnbProPrep cards moved under a new
+   heading below the 3 primary tool cards. Each shows a `ShareLinkRow` (copy-to-clipboard button)
+   with a vanity link `<origin>/moproprep` / `<origin>/dnbproprep`. Visiting those exact paths
+   (even logged out) instantly redirects via `window.location.replace()` in `main.jsx`, before
+   React even mounts — bypasses login entirely, intended for sharing on social media.
+4. **Mobile horizontal overflow (bug):** off-canvas Settings drawer (`position:fixed` + `transform:
+   translateX(100%)` when closed) was expanding `document.documentElement.scrollWidth` beyond the
+   viewport in some browsers. Fixed with a global `overflow-x:hidden` on `html, body` in index.css.
+5. **SuperMemory persistence + dedicated page (feature):** PDFs uploaded in SuperMemory previously
+   lived only in React state (lost on refresh). New backend `supermemory.py` (mounted at
+   `/api/supermemory`) + `storage.py` (Emergent object storage wrapper) persist PDF binaries in
+   object storage and metadata in `pdf_books`; custom tags created while reading persist in
+   `pdf_tags` (client generates the id/label, backend mirrors it — avoids ID-reconciliation
+   complexity). New `SuperMemoryPage.jsx`, opened via `window.open('/supermemory','_blank')` from
+   the home card, is a standalone page (routed in `main.jsx` by pathname, no router library added)
+   that independently hydrates the logged-in user's books/tags on load; reuses the existing
+   exported `DocumentVault`/`TagLibraryModal`/`PDFReader` from `App.jsx`. Shows a friendly
+   "sign in first" screen if opened while logged out.
+
+### Bonus bug found & fixed (not user-reported): duplicate Google-auth user records
+While cleaning up test data, found the REAL admin account (`adityasonofashok@gmail.com`) had two
+duplicate user documents with the same email but different `user_id` (one with onboarding done,
+one without) — created because `AuthContext.jsx`'s one-time Google `session_id` exchange effect
+had no guard against React StrictMode's double-invoke, causing two concurrent
+`POST /api/auth/google/session` calls to both pass a `find_one`-then-`insert_one` race. Fixed with
+(a) a `useRef` "already processed" guard in `AuthContext.jsx` (per the Emergent Auth playbook's
+documented StrictMode guidance), and (b) an atomic `find_one_and_update(upsert=True)` in
+`auth.py`'s `google_session` handler, plus (c) a unique index on `users.email` created at backend
+startup (`server.py`) as defense in depth. Duplicate merged/cleaned in DB; the real admin's
+session + onboarding data preserved.
+
+### Testing Status
+- testing_agent_v4, iteration_8.json: 100% pass on all 5 targeted items (mobile CSS, public home +
+  login modal, share links + vanity redirects, horizontal overflow fix, SuperMemory persistence +
+  standalone page), backend 6/6 new pytest cases (`/app/backend/tests/test_supermemory.py`).
+  Light regression confirmed ClinicFlow/SuperSummary/home navigation unaffected.
+- Minor polish: renamed misleading "Admin: Agent Instructions" section header (in Settings, visible
+  to all users — it's actually a per-browser localStorage prompt customization, not admin-gated)
+  to "Customize AI Instructions" per testing agent's design-issue note.
+
+## Known Issues / Backlog
+- **P2 (refactor, not urgent):** App.jsx (~3260 lines) and SuperSummary.jsx (~2287 lines) remain
+  monolithic — recommend splitting into per-component files in a future pass.
+- **P1 (setup, not a bug):** No admin AI provider key configured yet — sign in as
+  `adityasonofashok@gmail.com` (Google) and add a real key via Profile → Settings for AI-backed
+  chat/vision generation to work end-to-end. Local/offline note generation works without it.
+- **Deferred, not yet started:** Payment/subscription plan discussed with user (daily free quota of
+  10 discharge summaries + 10 clinical cases per user; ₹300/month paid plan for 10 summaries +
+  30 cases/day; referral bonus of +5 summaries/+10 cases per month for referrers) — user pivoted to
+  report the 5 bugs/features above before answering clarifying questions on exact quota/referral
+  logic and payment gateway (Razorpay suggested for INR). Revisit next session.
+- **User reported a production deployment failure** (Cloud Build error) in a system notification
+  during this session — not yet raised with the user or investigated, since preview environment is
+  unaffected and the user redirected attention to the 5 bugs/features above.
+
 ## Next Action Items
-- Awaiting user's next feature request or go-live confirmation. All 9 originally requested
-  product points (auth, admin, admin-only keys, SuperSummary restructure, persistence, admin
-  dashboard, publish/rate, rating prompt) are implemented and tested.
+- Await user testing/confirmation of the 5 fixes above on their own devices.
+- Resume the payment/subscription clarification questions (quota logic, referral trigger,
+  Razorpay vs other gateway, recurring vs one-time pass, upgrade-prompt UX) when user is ready.
+- Investigate/report the production deployment failure if the user brings it up.

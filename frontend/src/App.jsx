@@ -310,9 +310,9 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           </div>
         )}
 
-        {/* Admin: Agent Instructions */}
+        {/* Personal AI prompt customization — stored locally per-browser, available to any user */}
         <div style={{ borderTop: "1px solid var(--color-border-primary)", paddingTop: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 12px", color: TEAL.primary }}>Admin: Agent Instructions</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 12px", color: TEAL.primary }}>Customize AI Instructions</h3>
           
           <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 6 }}>Generic Mode Instructions</label>

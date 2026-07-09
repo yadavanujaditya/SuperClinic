@@ -8,6 +8,7 @@ import bcrypt
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, EmailStr, ConfigDict
+from pymongo import ReturnDocument
 
 from database import db
 
@@ -185,27 +186,31 @@ async def google_session(payload: GoogleSessionRequest, response: Response):
     data = r.json()
     email = data["email"].lower()
 
-    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
-    if user_doc:
-        update_fields = {"picture": data.get("picture"), "name": data.get("name") or user_doc["name"]}
-        await db.users.update_one({"user_id": user_doc["user_id"]}, {"$set": update_fields})
-        user_doc.update(update_fields)
-    else:
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        role = "admin" if email == ADMIN_EMAIL else "user"
-        user_doc = {
-            "user_id": user_id,
-            "email": email,
-            "name": data.get("name") or email.split("@")[0],
-            "picture": data.get("picture"),
-            "password_hash": None,
-            "profession": None,
-            "mobile_number": None,
-            "role": role,
-            "auth_provider": "google",
-            "created_at": datetime.now(timezone.utc),
-        }
-        await db.users.insert_one(user_doc)
+    # Atomic upsert on email prevents duplicate user documents if this endpoint is ever
+    # called twice concurrently for the same session (e.g. a frontend double-fire) —
+    # MongoDB guarantees only one of the concurrent upserts performs the insert.
+    now = datetime.now(timezone.utc)
+    role = "admin" if email == ADMIN_EMAIL else "user"
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    user_doc = await db.users.find_one_and_update(
+        {"email": email},
+        {
+            "$set": {"picture": data.get("picture"), "name": data.get("name") or email.split("@")[0]},
+            "$setOnInsert": {
+                "user_id": user_id,
+                "email": email,
+                "password_hash": None,
+                "profession": None,
+                "mobile_number": None,
+                "role": role,
+                "auth_provider": "google",
+                "created_at": now,
+            },
+        },
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0},
+    )
 
     session_token = data["session_token"]
     expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_EXPIRY_DAYS)

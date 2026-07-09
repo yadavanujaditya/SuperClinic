@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 const API_URL = import.meta.env.REACT_APP_BACKEND_URL;
 
@@ -18,6 +18,10 @@ async function apiFetch(path, options = {}) {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Guards against React StrictMode double-invoking this effect, which would otherwise
+  // fire the one-time session_id exchange twice and race the backend into creating
+  // duplicate user records for the same email.
+  const hasProcessedSession = useRef(false);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -34,6 +38,8 @@ export function AuthProvider({ children }) {
     (async () => {
       // If returning from Google OAuth redirect, session_id lives in the URL hash.
       if (window.location.hash?.includes("session_id=")) {
+        if (hasProcessedSession.current) return;
+        hasProcessedSession.current = true;
         const sessionId = window.location.hash.split("session_id=")[1]?.split("&")[0];
         try {
           const me = await apiFetch("/api/auth/google/session", {

@@ -84,6 +84,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def create_indexes():
+    # Unique index on email guards against duplicate user records even under
+    # true concurrent registration/Google-login requests (defense in depth
+    # alongside the atomic upsert in auth.py's google_session handler).
+    await db.users.create_index("email", unique=True)
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
