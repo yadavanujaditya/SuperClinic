@@ -53,30 +53,58 @@ Given the scope, this is being built in phases. **Phase 1 (auth) is complete and
 - DB cleaned of all test accounts before handoff; no seeded admin exists yet — real user must
   sign up with `adityasonofashok@gmail.com` to claim admin role.
 
-## Remaining Phases (awaiting user clarification — see open questions below)
-- **Phase 2:** Admin-only AI key (masked, not user-visible), other users don't need their own key
-  (requires backend AI proxy since AI calls currently go directly from browser with user-supplied key).
-- **Phase 3:** SuperSummary restructure — "AI Mode" as its own home-page-style card with image;
-  "Template Library" card with tabs "System Template" (renamed from Public) + "My Templates"
-  (Community tab fate unconfirmed — awaiting user answer).
-- **Phase 4:** Persistence — every generated discharge summary + every clinical case/consultation
-  saved and shown in user profile ("My Summaries" / "My Cases").
-- **Phase 5:** Admin dashboard — view all users' generated discharges + consultation workflows.
-- **Phase 6:** Publish & rate — users can publish custom templates/workflows publicly, others rate
-  1–5 stars (scope of "workflow" unconfirmed — templates only, consultation flows only, or both).
-- **Phase 7:** Post-completion rating prompt ("Rate your experience 1-5 stars" after generating a
-  summary or finishing a consultation).
+## [Feb 2026] Phases 2–7: Admin AI Proxy, SuperSummary Restructure, Persistence, Admin Dashboard, Community Publish/Rate, Rating Prompt — IMPLEMENTED
+All remaining phases from the original 9-point request are now complete and tested.
 
-## Known Issues / Backlog
-- **P2 (refactor, not urgent):** App.jsx (~3025 lines) and SuperSummary.jsx (~2287 lines) remain
-  monolithic — recommend splitting into per-component files in a future pass.
+- **Phase 2 (Admin-only AI key):** `/app/backend/admin_ai.py`. `GET/PUT/DELETE /api/admin/ai-config`
+  (admin-only, key stored server-side, only masked form e.g. `sk-ant••••7890` ever returned).
+  `GET /api/ai/status` (any user, provider name only, never the key). All AI calls now proxied via
+  `POST /api/ai/chat/stream` (SSE-style plain-text stream) and `POST /api/ai/vision` (OCR), using
+  the admin's server-stored key for Claude/Gemini/DeepSeek/OpenAI. Browser never sees an API key.
+  Streaming error handling: since `StreamingResponse` cannot change status after commit, upstream
+  errors (invalid key, network failure) are sent as an in-band `__AI_STREAM_ERROR__:<msg>` sentinel
+  in the byte stream. Frontend (`api.js`) detects this prefix and throws, letting `NoteScreen` /
+  `SuperFastAiWizard` correctly fall back to `generateLocalNote()` instead of silently saving an
+  empty AI response. (This was flagged as a HIGH bug in iteration_7 testing and is now fixed &
+  verified in code.)
+- **Phase 3 (SuperSummary restructure):** AI Mode is now its own home-style card (image + CTA).
+  Template Library card simplified to two tabs: "System Templates" (was "Public") + "My Templates".
+  Community tab removed from the Template Library; community browsing moved to a dedicated
+  `CommunityBrowserModal.jsx` reachable separately (publish/import flow), per user's clarified scope.
+- **Phase 4 (Persistence):** `/app/backend/records.py` — `POST /api/records/save`,
+  `GET /api/records/list` (filter by type: discharge_summary / clinical_case),
+  `DELETE /api/records/{id}`. Every generated discharge summary and clinical case is auto-saved.
+  Frontend: `RecordsModal.jsx` ("My Records") accessible from Profile, shows saved summaries/cases
+  with view/delete.
+- **Phase 5 (Admin dashboard):** `AdminDashboard.jsx`, backed by admin-only endpoints in
+  `records.py`/`auth.py` — tabs for Users, Discharge Summaries, Clinical Cases, Ratings, with
+  per-user breakdown of what was generated. Admin-only gated via `get_current_admin`.
+  Bug fixed during testing: nested modal missing `stopPropagation` caused any inner click to close
+  the whole modal tree — fixed (same pattern as `RecordsModal.jsx`/`CommunityBrowserModal.jsx`).
+- **Phase 6 (Publish & rate):** `/app/backend/community.py` — `POST /api/community/publish`,
+  `GET /api/community/list`, `POST /api/community/rate` (1–5 stars, per-user upsert, running
+  avg/count computed server-side, not raw arrays), `DELETE /api/community/{id}` (owner-only).
+  Covers both custom templates AND consultation workflows, importable by other users into their
+  own "My Templates"/library. No AI dependency — fully real/working, not mocked.
+- **Phase 7 (Rating prompt):** `RatingPrompt.jsx` — non-blocking modal shown after a summary/case
+  is generated, 1–5 stars + optional comment, saved and visible to admin via dashboard's Ratings tab.
 
 ## Testing Status
 - Phase 1 auth: testing_agent_v4 PASSED, 100%, 0 bugs (iteration_6.json).
 - Prior data-testid completeness pass: PASSED after 2 bug fixes (iteration_5.json).
+- Phases 2–7: testing_agent_v4 PASSED — 42/42 backend pytest (31 new + 11 pre-existing auth),
+  ~95% frontend (1 bug found+fixed: AdminDashboard stopPropagation; 1 backend bug found+fixed:
+  streaming AI error sentinel) (iteration_7.json).
+- DB verified clean post-testing: 0 users, 0 admin_settings, 0 records, 0 community_items.
+
+## Known Issues / Backlog
+- **P2 (refactor, not urgent):** App.jsx (~3025 lines) and SuperSummary.jsx (~2287 lines) remain
+  monolithic — recommend splitting into per-component files in a future pass.
+- **P1 (setup, not a bug):** No admin AI key is configured yet — real user must sign up with
+  `adityasonofashok@gmail.com` and add a real provider key via Profile → Settings before AI
+  generation (chat/vision) will work end-to-end. Local/offline note generation works without it.
 
 ## Next Action Items
-- Awaiting user answers to: (1) SuperSummary tab/card restructure exact spec, (2) scope of
-  "custom workflow" publishing (templates vs consultation flows vs both) + rating mechanism,
-  (3) exact UX for the post-summary rating prompt, (4) confirm phase order/priority for
-  Phases 2–7 above.
+- Awaiting user's next feature request or go-live confirmation. All 9 originally requested
+  product points (auth, admin, admin-only keys, SuperSummary restructure, persistence, admin
+  dashboard, publish/rate, rating prompt) are implemented and tested.
