@@ -28,7 +28,7 @@ function AuthShell({ children }) {
   );
 }
 
-export function LoginSignupScreen() {
+function AuthFormCard({ onAuthed }) {
   const { login, register, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState("login"); // login | signup
   const [name, setName] = useState("");
@@ -43,6 +43,7 @@ export function LoginSignupScreen() {
     try {
       if (mode === "login") await login(email.trim(), password);
       else await register(email.trim(), password, name.trim());
+      onAuthed?.();
     } catch (err) {
       setError(err.message || "Something went wrong");
     } finally {
@@ -51,73 +52,99 @@ export function LoginSignupScreen() {
   };
 
   return (
-    <AuthShell>
-      <div style={{ position: "relative", zIndex: 1, background: "#fff", borderRadius: 20, padding: "36px 32px", width: "100%", maxWidth: 400, boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
-          <span style={{ fontSize: 26 }}>⚡</span>
-          <div>
-            <h1 style={{ fontSize: 19, fontWeight: 900, margin: 0, color: "var(--color-text-primary)" }}>ClinicFlow</h1>
-            <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Comprehensive Clinical Intelligence Suite</p>
-          </div>
+    <div style={{ position: "relative", zIndex: 1, background: "#fff", borderRadius: 20, padding: "36px 32px", width: "100%", maxWidth: 400, boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+        <span style={{ fontSize: 26 }}>⚡</span>
+        <div>
+          <h1 style={{ fontSize: 19, fontWeight: 900, margin: 0, color: "var(--color-text-primary)" }}>ClinicFlow</h1>
+          <p style={{ fontSize: 11, color: "var(--color-text-secondary)", margin: 0 }}>Comprehensive Clinical Intelligence Suite</p>
         </div>
-
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 20px" }}>
-          {mode === "login" ? "Sign in to continue to your workspace." : "Sign up to start using ClinicFlow & SuperSummary."}
-        </p>
-
-        <button
-          data-testid="google-signin-btn"
-          type="button"
-          onClick={loginWithGoogle}
-          style={{
-            width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            padding: "11px 14px", borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#fff",
-            fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 16, fontFamily: "var(--font-sans)",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 48 48">
-            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z" />
-            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3.1 0 5.9 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 15.8 3 8.8 7.7 6.3 14.7z" />
-            <path fill="#4CAF50" d="M24 45c5.4 0 10.3-2 13.9-5.2l-6.4-5.4C29.5 36.2 26.9 37 24 37c-5.2 0-9.6-3.4-11.2-8l-6.6 5.1C8.7 40.3 15.8 45 24 45z" />
-            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.6l6.4 5.4c3.7-3.4 6.3-8.5 6.3-14.5 0-1.2-.1-2.4-.4-3.5z" />
-          </svg>
-          Sign in with Google
-        </button>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 16px" }}>
-          <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-          <span style={{ fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 600 }}>OR</span>
-          <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
-        </div>
-
-        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {mode === "signup" && (
-            <input data-testid="signup-name-input" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" required style={inputStyle} />
-          )}
-          <input data-testid="auth-email-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" required style={inputStyle} />
-          <input data-testid="auth-password-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required minLength={6} style={inputStyle} />
-
-          {error && (
-            <p data-testid="auth-error-message" style={{ fontSize: 13, color: "#dc2626", margin: 0, background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>{error}</p>
-          )}
-
-          <button data-testid="auth-submit-btn" type="submit" disabled={loading} style={{
-            padding: "12px", borderRadius: 10, border: "none", background: TEAL.primary, color: "#fff",
-            fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
-          }}>
-            {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-          </button>
-        </form>
-
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "center", margin: "18px 0 0" }}>
-          {mode === "login" ? "New here?" : "Already have an account?"}{" "}
-          <button data-testid="auth-toggle-mode-btn" onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "var(--font-sans)" }}>
-            {mode === "login" ? "Create an account" : "Sign in"}
-          </button>
-        </p>
       </div>
+
+      <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px" }}>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
+      <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 20px" }}>
+        {mode === "login" ? "Sign in to continue to your workspace." : "Sign up to start using ClinicFlow & SuperSummary."}
+      </p>
+
+      <button
+        data-testid="google-signin-btn"
+        type="button"
+        onClick={loginWithGoogle}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          padding: "11px 14px", borderRadius: 10, border: "1.5px solid #E2E8F0", background: "#fff",
+          fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 16, fontFamily: "var(--font-sans)",
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.2-.1-2.4-.4-3.5z" />
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3.1 0 5.9 1.1 8 3l6-6C34.5 5.1 29.5 3 24 3 15.8 3 8.8 7.7 6.3 14.7z" />
+          <path fill="#4CAF50" d="M24 45c5.4 0 10.3-2 13.9-5.2l-6.4-5.4C29.5 36.2 26.9 37 24 37c-5.2 0-9.6-3.4-11.2-8l-6.6 5.1C8.7 40.3 15.8 45 24 45z" />
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.6l6.4 5.4c3.7-3.4 6.3-8.5 6.3-14.5 0-1.2-.1-2.4-.4-3.5z" />
+        </svg>
+        Sign in with Google
+      </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 0 16px" }}>
+        <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+        <span style={{ fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 600 }}>OR</span>
+        <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+      </div>
+
+      <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {mode === "signup" && (
+          <input data-testid="signup-name-input" value={name} onChange={e => setName(e.target.value)} placeholder="Full name" required style={inputStyle} />
+        )}
+        <input data-testid="auth-email-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" required style={inputStyle} />
+        <input data-testid="auth-password-input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required minLength={6} style={inputStyle} />
+
+        {error && (
+          <p data-testid="auth-error-message" style={{ fontSize: 13, color: "#dc2626", margin: 0, background: "#fef2f2", padding: "8px 12px", borderRadius: 8 }}>{error}</p>
+        )}
+
+        <button data-testid="auth-submit-btn" type="submit" disabled={loading} style={{
+          padding: "12px", borderRadius: 10, border: "none", background: TEAL.primary, color: "#fff",
+          fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
+        }}>
+          {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
+        </button>
+      </form>
+
+      <p style={{ fontSize: 13, color: "var(--color-text-secondary)", textAlign: "center", margin: "18px 0 0" }}>
+        {mode === "login" ? "New here?" : "Already have an account?"}{" "}
+        <button data-testid="auth-toggle-mode-btn" onClick={() => { setMode(m => m === "login" ? "signup" : "login"); setError(""); }} style={{ background: "none", border: "none", color: TEAL.primary, fontWeight: 700, cursor: "pointer", fontSize: 13, padding: 0, fontFamily: "var(--font-sans)" }}>
+          {mode === "login" ? "Create an account" : "Sign in"}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+export function LoginSignupScreen() {
+  return (
+    <AuthShell>
+      <AuthFormCard />
     </AuthShell>
+  );
+}
+
+// Non-blocking overlay version — shown on demand when a guest tries to use a gated
+// feature from the (now publicly-browsable) home page, instead of walling off the whole app.
+export function LoginModal({ onClose }) {
+  return (
+    <div data-testid="login-modal-overlay" onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+      background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)",
+    }} className="anim-fade">
+      <div onClick={e => e.stopPropagation()} style={{ position: "relative" }} className="anim-fade-up">
+        <button data-testid="login-modal-close-btn" onClick={onClose} style={{
+          position: "absolute", top: -14, right: -14, width: 32, height: 32, borderRadius: "50%", zIndex: 2,
+          background: "#fff", border: "1.5px solid #E2E8F0", color: "var(--color-text-secondary)", fontSize: 16, cursor: "pointer",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        }}>✕</button>
+        <AuthFormCard onAuthed={onClose} />
+      </div>
+    </div>
   );
 }
 
@@ -206,7 +233,8 @@ export function AuthGate({ children }) {
     );
   }
 
-  if (!user) return <LoginSignupScreen />;
-  if (!user.profession || !user.mobile_number) return <OnboardingModal />;
+  // Guests can browse the home page freely. Individual features gate themselves with
+  // <LoginModal> when a guest tries to actually use them (see App.jsx's requireAuth()).
+  if (user && (!user.profession || !user.mobile_number)) return <OnboardingModal />;
   return children;
 }

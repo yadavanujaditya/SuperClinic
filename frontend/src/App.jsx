@@ -10,6 +10,8 @@ import { RecordsModal } from "./RecordsModal.jsx";
 import { AdminDashboard } from "./AdminDashboard.jsx";
 import { RatingPrompt } from "./RatingPrompt.jsx";
 import { publishWorkflow, listCommunityWorkflows, rateWorkflow } from "./community.js";
+import { listBooks, uploadBook, downloadBook, deleteBook, listTags, upsertTagSource, removeTagSourceRemote, deleteTagRemote } from "./supermemory.js";
+import { LoginModal } from "./AuthScreens.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -58,6 +60,27 @@ function Card({ children, style: s = {}, onClick, testId, className }) {
     <div data-testid={testId} className={className} style={{ background: "#fff", border: "1.5px solid var(--color-border-primary)", borderRadius: 12,
       padding: 16, boxShadow: "var(--shadow-sm)", ...s }} onClick={onClick}>
       {children}
+    </div>
+  );
+}
+
+// Shareable vanity link row (e.g. "yourapp.com/moproprep") — copies a link that instantly
+// redirects to the partner site, so users can share it without needing to be logged in.
+function ShareLinkRow({ path, testId, accent }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}${path}`;
+  const copy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--color-background-secondary)", borderRadius: 8, padding: "6px 10px" }}>
+      <span data-testid={`share-link-${testId}-text`} style={{ fontSize: 11.5, color: "var(--color-text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{link}</span>
+      <button data-testid={`share-link-${testId}-copy-btn`} onClick={copy} style={{ fontSize: 11, fontWeight: 700, color: copied ? "#fff" : accent, background: copied ? accent : "transparent", border: `1.5px solid ${accent}`, borderRadius: 6, padding: "3px 8px", cursor: "pointer", flexShrink: 0, fontFamily: "var(--font-sans)" }}>
+        {copied ? "Copied ✓" : "Copy"}
+      </button>
     </div>
   );
 }
@@ -771,11 +794,11 @@ function ComplaintEditor({ complaint, onSave, onClose, tagLibrary = [], noAiNoti
 }
 
 // ─── SuperMemory (collapsed Document Vault) ──────────────────────────────────
-function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pdfBuffers, onOpenReader, onOpenTagLibrary }) {
+export function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pdfBuffers, onOpenReader, onOpenTagLibrary, defaultExpanded = false }) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(null);
   const [parsing, setParsing] = useState(null);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const fileRef = useRef();
 
   const processFile = async (file) => {
@@ -790,6 +813,10 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
         const pdf = await window.pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
         pdfBuffers.current.set(name, buf);
         setPdfDocs(prev => [...prev, { name, numPages: pdf.numPages, isPdf: true, parsed: false }]);
+        try {
+          const saved = await uploadBook(file, pdf.numPages);
+          setPdfDocs(prev => prev.map(d => d.name === name ? { ...d, bookId: saved.id } : d));
+        } catch (e) { console.error("Could not save book to your profile:", e); }
       } else {
         const text = await file.text();
         const chunks = chunkText(text, name);
@@ -813,11 +840,13 @@ function DocumentVault({ pdfDocs, setPdfDocs, idx, tagLibrary, setTagLibrary, pd
   };
 
   const removeDoc = (name) => {
+    const doc = pdfDocs.find(d => d.name === name);
     pdfBuffers.current.delete(name);
     setPdfDocs(prev => prev.filter(d => d.name !== name));
     setTagLibrary(prev => prev
       .map(t => ({ ...t, sources: t.sources.filter(s => s.docName !== name) }))
       .filter(t => t.sources.length > 0));
+    if (doc?.bookId) deleteBook(doc.bookId).catch(() => {});
   };
 
   const totalDocs = pdfDocs.length;
@@ -1221,8 +1250,10 @@ function ProfileModal({ onClose, onSettings }) {
 
 // ─── Profile Menu ─────────────────────────────────────────────────────────────
 function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
   const ref = useRef();
 
   useEffect(() => {
@@ -1235,6 +1266,19 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   const itemS = { width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer",
     border: "none", background: "none", color: "var(--color-text-primary)", fontFamily: "var(--font-sans)",
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 };
+
+  if (!user) {
+    return (
+      <>
+        <button data-testid="profile-menu-signin-btn" onClick={() => setLoginModalOpen(true)}
+          style={{ padding: "8px 18px", borderRadius: 20, fontSize: 13, fontWeight: 700, cursor: "pointer",
+            border: "1.5px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", fontFamily: "var(--font-sans)" }}>
+          Sign In
+        </button>
+        {loginModalOpen && <LoginModal onClose={() => setLoginModalOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -1265,6 +1309,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
   );
 }
 
+
 // ─── Library Screen ───────────────────────────────────────────────────────────
 function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdfDocs, customComplaints, setCustomComplaints, setSettingsOpen, tagLibrary, setTagLibrary, pdfBuffers, product, setProduct }) {
   const [selected, setSelected] = useState(null);
@@ -1293,14 +1338,23 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
       }
       return [...prev, { id, label: label.trim(), sources: [{ docName, page, extractedText, image }] }];
     });
+    const docEntry = pdfDocs.find(d => d.name === docName);
+    if (docEntry?.bookId) {
+      upsertTagSource(id, label.trim(), { doc_id: docEntry.bookId, doc_name: docName, page, extracted_text: extractedText, image }).catch(() => {});
+    }
     return id;
   };
   const removeTagSource = (tagId, docName, page) => {
     setTagLibrary(prev => prev
       .map(t => t.id === tagId ? { ...t, sources: t.sources.filter(s => !(s.docName === docName && s.page === page)) } : t)
       .filter(t => t.sources.length > 0));
+    const docEntry = pdfDocs.find(d => d.name === docName);
+    if (docEntry?.bookId) removeTagSourceRemote(tagId, docEntry.bookId, page).catch(() => {});
   };
-  const removeTag = (tagId) => setTagLibrary(prev => prev.filter(t => t.id !== tagId));
+  const removeTag = (tagId) => {
+    setTagLibrary(prev => prev.filter(t => t.id !== tagId));
+    deleteTagRemote(tagId).catch(() => {});
+  };
 
   const saveComplaint = (c) => {
     const prev = JSON.parse(localStorage.getItem("clinicalmind:complaints") || "[]");
@@ -1410,7 +1464,13 @@ Return ONLY valid JSON with this exact structure:
 
         <div className="library-grid">
           <Card><DocumentVault pdfDocs={pdfDocs} setPdfDocs={setPdfDocs} idx={idx} tagLibrary={tagLibrary} setTagLibrary={setTagLibrary} pdfBuffers={pdfBuffers}
-            onOpenReader={(doc, initPage) => setReaderState({ doc, initPage: initPage || 1 })}
+            onOpenReader={async (doc, initPage) => {
+              if (!pdfBuffers.current.get(doc.name) && doc.bookId) {
+                try { pdfBuffers.current.set(doc.name, await downloadBook(doc.bookId)); }
+                catch (e) { alert("Could not load this book: " + e.message); return; }
+              }
+              setReaderState({ doc, initPage: initPage || 1 });
+            }}
             onOpenTagLibrary={() => setTagLibraryOpen(true)} /></Card>
           <Card><ComplaintLibrary selected={selected} setSelected={setSelected} onEdit={openEdit} customComplaints={customComplaints} onModeChange={setIsAiMode}
             onPublish={publishWorkflowHandler} onImport={importWorkflowHandler} /></Card>
@@ -1572,9 +1632,14 @@ Return ONLY valid JSON with this exact structure:
           tagLibrary={tagLibrary}
           pdfBuffers={pdfBuffers}
           onRemoveTag={removeTag}
-          onOpenReader={(docName, page) => {
+          onOpenReader={async (docName, page) => {
             const doc = pdfDocs.find(d => d.name === docName);
-            if (doc) { setTagLibraryOpen(false); setReaderState({ doc, initPage: page }); }
+            if (!doc) return;
+            if (!pdfBuffers.current.get(doc.name) && doc.bookId) {
+              try { pdfBuffers.current.set(doc.name, await downloadBook(doc.bookId)); }
+              catch (e) { alert("Could not load this book: " + e.message); return; }
+            }
+            setTagLibraryOpen(false); setReaderState({ doc, initPage: page });
           }}
           onClose={() => setTagLibraryOpen(false)}
         />
@@ -1592,7 +1657,7 @@ Return ONLY valid JSON with this exact structure:
 }
 
 // ─── PDF Book Reader ─────────────────────────────────────────────────────────
-function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onRemoveTagSource, onOpenTagLibrary, onClose, onCreateComplaint }) {
+export function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onRemoveTagSource, onOpenTagLibrary, onClose, onCreateComplaint }) {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(initPage);
@@ -2001,7 +2066,7 @@ function PDFReader({ docName, buf, initPage = 1, tagLibrary, onAddTagSource, onR
 }
 
 // ─── Tag Library Browser ──────────────────────────────────────────────────────
-function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, onClose }) {
+export function TagLibraryModal({ tagLibrary, pdfBuffers, onOpenReader, onRemoveTag, onClose }) {
   const [selectedId, setSelectedId] = useState(tagLibrary[0]?.id || null);
   const [lightbox, setLightbox] = useState(null); // image src
   const selected = tagLibrary.find(t => t.id === selectedId);
@@ -2619,8 +2684,8 @@ Rules:
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-background-primary)" }}>
-      <div style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "12px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+    <div className="consultation-root" style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--color-background-primary)" }}>
+      <div className="consultation-header" style={{ background: "#fff", borderBottom: "1px solid var(--color-border-primary)", padding: "12px 20px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
         <span style={{ fontSize: 20 }}>🩺</span>
         <Badge color={TEAL}>{age} · {sex}</Badge>
         <Badge color={{ bg: "#F0F0F0", text: "#333", border: "#DDD" }}>{complaint.name}</Badge>
@@ -2641,7 +2706,7 @@ Rules:
       )}
 
       <div className="consultation-layout" style={{ flex: 1, overflow: "hidden" }}>
-        <div style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="consultation-main" style={{ padding: 20, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
           {history.length > 0 && (
             <div ref={histRef} style={{ maxHeight: 150, overflowY: "auto", background: "var(--color-background-secondary)", borderRadius: 10, padding: "10px 14px" }}>
               {history.map((h, i) => (
@@ -2957,6 +3022,30 @@ export default function App() {
 
   useEffect(() => { refreshAiStatus(); }, []);
 
+  // Hydrate SuperMemory (uploaded books + custom tags) from the backend on login,
+  // so a user's library follows them across devices/sessions instead of resetting.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      try {
+        const [books, tags] = await Promise.all([listBooks(), listTags()]);
+        setPdfDocs(books.map(b => ({ name: b.name, numPages: b.num_pages, isPdf: true, parsed: false, bookId: b.id })));
+        setTagLibrary(tags.map(t => ({
+          id: t.id, label: t.label,
+          sources: t.sources.map(s => ({ docName: s.doc_name, page: s.page, extractedText: s.extracted_text, image: s.image })),
+        })));
+      } catch (e) { console.error("Could not load your SuperMemory library:", e); }
+    })();
+  }, [user]);
+
+  // Guests can browse the home page freely — this gate only fires when they try to
+  // actually use a feature (launch a tool / open an external partner link).
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const requireAuth = (action) => {
+    if (user) { action(); return; }
+    setLoginModalOpen(true);
+  };
+
   // Provider/key are now managed centrally by the admin — these are no-ops for regular
   // users and are only reachable via the admin-only settings UI, which calls refreshAiStatus().
   const handleProviderChange = () => {};
@@ -3003,7 +3092,7 @@ export default function App() {
 
             <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
               {/* Card 1: ClinicFlow */}
-              <Card testId="home-card-clinicflow" onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
+              <Card testId="home-card-clinicflow" onClick={() => requireAuth(() => setProduct("clinicalmind"))} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(13, 148, 136, 0.15)" }} className="premium-card">
                 <div style={{ background: "#f0fdfa", borderBottom: "1px solid rgba(13, 148, 136, 0.08)" }}>
                   <CardCarousel accent="#0d9488" slides={[IllustConsult, IllustDifferential, IllustSafety]} />
                 </div>
@@ -3022,7 +3111,7 @@ export default function App() {
               </Card>
 
               {/* Card 2: SuperSummary */}
-              <Card testId="home-card-supersummary" onClick={() => setProduct("supersummary")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
+              <Card testId="home-card-supersummary" onClick={() => requireAuth(() => setProduct("supersummary"))} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(124, 58, 237, 0.15)" }} className="premium-card">
                 <div style={{ background: "#f5f3ff", borderBottom: "1px solid rgba(124, 58, 237, 0.08)" }}>
                   <CardCarousel accent="#7c3aed" slides={[IllustDocs, IllustScan]} />
                 </div>
@@ -3040,8 +3129,8 @@ export default function App() {
                 </div>
               </Card>
 
-              {/* Card 3: SuperMemory — your reference library, surfaced right on the home page */}
-              <Card testId="home-card-supermemory" onClick={() => setProduct("clinicalmind")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
+              {/* Card 3: SuperMemory — opens as its own page in a new tab, own login gate too */}
+              <Card testId="home-card-supermemory" onClick={() => requireAuth(() => window.open("/supermemory", "_blank"))} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(245, 158, 11, 0.2)" }} className="premium-card">
                 <div style={{ background: "#fff7ed", borderBottom: "1px solid rgba(245, 158, 11, 0.1)" }}>
                   <CardCarousel accent="#f59e0b" slides={[IllustLibrary, IllustDocs]} />
                 </div>
@@ -3058,9 +3147,16 @@ export default function App() {
                   </button>
                 </div>
               </Card>
+            </div>
 
+            {/* Our Other Apps — MoProPrep & DnbProPrep, each with a shareable vanity link */}
+            <div style={{ marginTop: 40, marginBottom: 18 }}>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: "var(--color-text-primary)", margin: 0 }}>Our Other Apps</h2>
+              <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "2px 0 0" }}>Sister platforms from the same team — share these links with your friends.</p>
+            </div>
+            <div className="library-grid anim-fade-up" style={{ width: "100%", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))" }}>
               {/* Card 4: MoProPrep — external gamified learning platform */}
-              <Card testId="home-card-moproprep" onClick={() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
+              <Card testId="home-card-moproprep" onClick={() => requireAuth(() => window.open("https://www.moproprep.in/", "_blank", "noopener,noreferrer"))} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(8, 145, 178, 0.2)" }} className="premium-card">
                 <div style={{ background: "#ecfeff", borderBottom: "1px solid rgba(8, 145, 178, 0.1)" }}>
                   <CardCarousel accent="#0891b2" slides={[IllustGame]} />
                 </div>
@@ -3069,17 +3165,18 @@ export default function App() {
                     <span style={{ fontSize: 20 }}>🎮</span>
                     <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0891b2", margin: 0 }}>MoProPrep</h3>
                   </div>
-                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 14px 0", flex: 1 }}>
                     Learn medicine the fun way — a gamified prep platform with quizzes, streaks, and challenges. Opens in a new tab.
                   </p>
-                  <button data-testid="play-learn-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
+                  <ShareLinkRow path="/moproprep" testId="moproprep" accent="#0891b2" />
+                  <button data-testid="play-learn-btn" style={{ alignSelf: "flex-start", marginTop: 12, padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#0891b2", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(8, 145, 178, 0.25)" }}>
                     Play & Learn ↗
                   </button>
                 </div>
               </Card>
 
               {/* Card 5: DnbProPrep — external DNB exam prep platform */}
-              <Card testId="home-card-dnbproprep" onClick={() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer")} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
+              <Card testId="home-card-dnbproprep" onClick={() => requireAuth(() => window.open("https://dnbproprep.com/", "_blank", "noopener,noreferrer"))} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(79, 70, 229, 0.2)" }} className="premium-card">
                 <div style={{ background: "#eef2ff", borderBottom: "1px solid rgba(79, 70, 229, 0.1)" }}>
                   <CardCarousel accent="#4f46e5" slides={[IllustDnb]} />
                 </div>
@@ -3088,10 +3185,11 @@ export default function App() {
                     <span style={{ fontSize: 20 }}>🎓</span>
                     <h3 style={{ fontSize: 18, fontWeight: 800, color: "#4f46e5", margin: 0 }}>DnbProPrep</h3>
                   </div>
-                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 14px 0", flex: 1 }}>
                     Focused DNB exam preparation — structured practice and review material. Opens in a new tab.
                   </p>
-                  <button data-testid="prep-dnb-btn" style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
+                  <ShareLinkRow path="/dnbproprep" testId="dnbproprep" accent="#4f46e5" />
+                  <button data-testid="prep-dnb-btn" style={{ alignSelf: "flex-start", marginTop: 12, padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "#4f46e5", color: "#fff", border: "none", cursor: "pointer", boxShadow: "0 4px 10px rgba(79, 70, 229, 0.25)" }}>
                     Prep for DNB ↗
                   </button>
                 </div>
@@ -3099,6 +3197,7 @@ export default function App() {
             </div>
           </div>
           <AppFooter />
+          {loginModalOpen && <LoginModal onClose={() => setLoginModalOpen(false)} />}
         </div>
       )}
       {product === "supersummary" && (

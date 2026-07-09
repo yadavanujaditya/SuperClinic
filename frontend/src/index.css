@@ -47,6 +47,7 @@ html, body, #root {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 button { font-family: var(--font-sans); cursor: pointer; border: none; background: none; }
@@ -132,10 +133,22 @@ textarea { resize: vertical; }
     align-items: stretch !important;
     gap: 12px !important;
   }
+  .consultation-root {
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+  .consultation-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 20 !important;
+  }
   .consultation-layout {
     grid-template-columns: 1fr !important;
-    overflow-y: auto !important;
+    overflow: visible !important;
     height: auto !important;
+  }
+  .consultation-main {
+    overflow-y: visible !important;
   }
   .consultation-sidebar {
     border-left: none !important;
