@@ -1,7 +1,7 @@
 import os
 import requests
 
-STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+STORAGE_URL = f"{os.environ.get('INTEGRATION_PROXY_URL')}/objstore/api/v1/storage"
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
 APP_NAME = "superclinic"
 

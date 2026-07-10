@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only regression pass on the App.jsx/SuperSummary.jsx file-split refactor (no functional changes intended). Verified via Playwright across desktop (1920x1080) and mobile (390x844) viewports: guest home page renders with all 3 tool cards + Our Other Apps section; clicking a card while logged out opens LoginModal (not a redirect); email/password sign-in works (test_user_127543@example.com); full ClinicFlow flow (LibraryScreen -> System complaint select -> age/sex -> Start Consultation -> ConsultationScreen answering via option buttons through 7 rounds with red-flag detection and live differentials updating -> Generate Note -> NoteScreen with Copy/New Patient, New Patient correctly returns to LibraryScreen); DocumentVault dropzone + Tag Library (via profile-menu path, since the DocumentVault-embedded Tag Library button only renders when tagLibrary.length>0, which is 0 for a fresh test user) renders TagLibraryModal with correct empty state; SuperSummary flow (AiModeCard + TemplateLibrary render side-by-side with System Template/My Templates tabs + HowToUseCarousel -> clicking a system template opens Discharge Summary Flow modal -> Smart Summary Editor opens FillScreen with blanks, Copy/Close/Save-as-template -> '+ New Template' opens TemplateEditor modal with paste+make-blank UI). No 'is not defined'/'Cannot find module'/'is not a function' console errors observed in any flow -- only expected 401s from unauthenticated /api/auth/me and /api/ai/status probes on initial guest load. Mobile viewport sanity: home page and post-login LibraryScreen both have scrollWidth===innerWidth (390, no horizontal overflow), consistent with previously-verified mobile CSS fixes. Admin dashboard NOT tested (Google-OAuth-only account, not automatable per instructions -- consistent with iteration_8 skip). Did not deep re-test community publish/rate or SuperMemory backend persistence (already covered iteration_8) -- this session's scope was specifically the refactor regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "ConsultationScreen (adult patient, e.g. age 30)",
+        "issues": ["Some scripted questions in the 'Fever — General' offline complaint tree use pediatric wording (e.g. 'Does the child have severe shaking chills or rigors?') even when patient age is entered as an adult (30 years). Pre-existing content/data issue in the offline question bank, not introduced by this refactor -- flagging as a minor content polish item only."]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "No blocking regressions found from the file-split refactor -- all extracted components (LibraryScreen, PDFReader, TagLibraryModal, ConsultationScreen, NoteScreen, SuperSummaryShared, DocumentIntake, SafetyCheckPanel, SaveAsTemplateModal, TemplateEditor, TemplateLibrary, AiModeCard, FillScreen, SuperFastAiWizard, AIModeScreen) render, wire props correctly, and share state with parents as before.",
+    "Optional/minor: reword pediatric-specific question phrasing in the offline 'Fever — General' complaint bank to be age-neutral (adult vs child), unrelated to this refactor.",
+    "Optional: Admin dashboard regression still unverified since real admin account is Google-OAuth-only with no documented password; recommend creating an email/password admin test account if admin-flow regression testing is needed in future sessions."
+  ],
+  "critical_code_review_comments": [
+    "App.jsx (288 lines) cleanly delegates to LibraryScreen/ConsultationScreen/NoteScreen/SuperSummary with clear prop contracts -- no prop-name mismatches found during live testing (session, idx, provider, apiKey, tagLibrary, pdfBuffers, setSettingsOpen all wired correctly).",
+    "LibraryScreen.jsx correctly imports DocumentVault, ComplaintLibrary, ComplaintEditor, ProfileMenu, PDFReader, TagLibraryModal from their dedicated files -- no broken imports observed; TagLibraryModal open/close state (tagLibraryOpen) correctly shared between the ProfileMenu path and the DocumentVault-embedded path.",
+    "ConsultationScreen.jsx's internal OptionButton/DifferentialsPanel helpers correctly re-render differentials and red-flag banners in real time as history grows -- confirmed through an 8-question offline flow with dengue-hemorrhagic/meningitis/pneumonia red flags triggering appropriately.",
+    "SuperSummary.jsx (196 lines) root correctly routes phase (library/fill/ai/ai_wizard) with TemplateLibrary+AiModeCard rendering side by side as designed -- Discharge Summary Flow modal -> FillScreen and +New Template -> TemplateEditor both function without console errors.",
+    "Minor observation (not a bug): DocumentVault's inline 'Tag Library' button only appears once tagLibrary.length>0, so for brand-new users the only way to open TagLibraryModal is via the ProfileMenu avatar dropdown -- this is pre-existing UX (not part of this refactor) but worth noting for discoverability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (out of scope this session)", "frontend": "100% of requested flows verified working"},
+  "test_credentials": "Used existing test_user_127543@example.com / SecurePass123 and test_mobile_655284@example.com / SecurePass123 from test_credentials.md. No new accounts created.",
+  "seed_data_creation": "None -- reused existing test accounts, no new templates/PDFs persisted (FillScreen and TemplateEditor were opened but not saved to avoid polluting seed data).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "This session confirmed the App.jsx/SuperSummary.jsx file-split refactor introduced NO regressions across ClinicFlow (full consult->note flow), SuperSummary (template library->fill screen->template editor), SuperMemory/DocumentVault/TagLibraryModal, guest home page + login-modal gating, and mobile viewport CSS. All new extracted files (LibraryScreen, PDFReader, TagLibraryModal, ConsultationScreen, NoteScreen, SuperSummaryShared, DocumentIntake, SafetyCheckPanel, SaveAsTemplateModal, TemplateEditor, TemplateLibrary, AiModeCard, FillScreen, SuperFastAiWizard, AIModeScreen) are functioning correctly with proper prop wiring. Admin dashboard still unverified (Google-OAuth-only, no test password documented) -- same limitation as iteration_8. Next agent can pick up fresh feature work without needing to re-verify this refactor.",
+  "rca_of_the_issue": "No bugs found. One useful testing note for future agents: the ClinicFlow 'Generate Note' top-bar button requires history.length>=4 (i.e. at least 4 answered questions) to enable; answering via free-text custom input (instead of preset option buttons) triggers an AI-continuation call that fails gracefully with a 'No API key configured' panel + only an 'Add API Key' CTA (no offline fallback) if it happens before 4 questions are answered -- this is expected/by-design behavior tied to the scripted-tree depth, not a refactor regression. Sticking to option-button clicks lets the offline tree run much deeper (8+ questions) before needing AI."
+}

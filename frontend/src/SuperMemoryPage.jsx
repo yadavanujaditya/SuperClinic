@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { BM25 } from "./bm25.js";
-import { TagLibraryModal, PDFReader } from "./App.jsx";
+import { TagLibraryModal } from "./TagLibraryModal.jsx";
+import { PDFReader } from "./PDFReader.jsx";
 import { DocumentVault } from "./DocumentVault.jsx";
 import { useAuth } from "./AuthContext.jsx";
 import { listBooks, uploadBook, downloadBook, deleteBook, listTags, upsertTagSource, removeTagSourceRemote, deleteTagRemote } from "./supermemory.js";
