@@ -229,6 +229,20 @@ export function IllustDnb() {
   );
 }
 
+export function IllustSpeed() {
+  return (
+    <IllustBase bg="#faf5ff">
+      <rect x="70" y="128" width="160" height="14" rx="7" fill="#e9d5ff" />
+      <path d="M110 128 q40 -60 80 0 Z" fill="#ddd6fe" opacity="0.6" />
+      <path d="M118 100 h64 a14 14 0 0 1 14 14 v10 a10 10 0 0 1 -10 10 h-8 l-8 10 h-36 l-8 -10 h-8 a10 10 0 0 1 -10 -10 v-10 a14 14 0 0 1 14 -14 Z" fill="#8B5CF6" />
+      <circle cx="132" cy="128" r="9" fill="#1e1b3a" /><circle cx="132" cy="128" r="4" fill="#c4b5fd" />
+      <circle cx="178" cy="128" r="9" fill="#1e1b3a" /><circle cx="178" cy="128" r="4" fill="#c4b5fd" />
+      <rect x="140" y="94" width="20" height="10" rx="3" fill="#A855F7" />
+      <path d="M60 116 h18 M56 124 h14 M60 132 h18" stroke="#c4b5fd" strokeWidth="3" strokeLinecap="round" />
+    </IllustBase>
+  );
+}
+
 // Small auto-rotating illustration carousel used inside a card (replaces a single static image).
 export function CardCarousel({ slides, accent = "#0d9488", height = 170 }) {
   const [i, setI] = useState(0);

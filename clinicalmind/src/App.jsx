@@ -3,7 +3,8 @@ import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js"
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
-import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, AppFooter } from "./HomeHero.jsx";
+import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, IllustSpeed, AppFooter } from "./HomeHero.jsx";
+import SpeedMD from "./SpeedMD.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -2786,6 +2787,7 @@ export default function App() {
   const [provider, setProvider] = useState(() => localStorage.getItem("clinicalmind:provider") || "claude");
   const [apiKey, setApiKey] = useState(() => apiKeyFor(localStorage.getItem("clinicalmind:provider") || "claude"));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [speedMdOpen, setSpeedMdOpen] = useState(false);
   const [session, setSession] = useState(null);
   const [noteData, setNoteData] = useState(null);
   const [pdfDocs, setPdfDocs] = useState([]);
@@ -2940,9 +2942,29 @@ export default function App() {
                   </button>
                 </div>
               </Card>
+
+              {/* Card 6: SpeedMD — in-app racing quiz game */}
+              <Card onClick={() => setSpeedMdOpen(true)} style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column", height: "100%", cursor: "pointer", border: "1px solid rgba(139, 92, 246, 0.25)" }} className="premium-card">
+                <div style={{ background: "#faf5ff", borderBottom: "1px solid rgba(139, 92, 246, 0.15)" }}>
+                  <CardCarousel accent="#8B5CF6" slides={[IllustSpeed]} />
+                </div>
+                <div style={{ padding: 24, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>🏎️</span>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, color: "#8B5CF6", margin: 0 }}>SpeedMD</h3>
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 20px 0", flex: 1 }}>
+                    A racing quiz built into ClinicFlow — build a quiz by exam, subject or year, then steer your car into the right answer as the speed ramps up.
+                  </p>
+                  <button style={{ alignSelf: "flex-start", padding: "10px 18px", borderRadius: 8, fontSize: 13, fontWeight: 700, background: "linear-gradient(135deg,#8B5CF6,#A855F7)", color: "#fff", border: "none", boxShadow: "0 4px 10px rgba(139, 92, 246, 0.3)" }}>
+                    Start Racing 🏁
+                  </button>
+                </div>
+              </Card>
             </div>
           </div>
           <AppFooter />
+          {speedMdOpen && <SpeedMD onClose={() => setSpeedMdOpen(false)} />}
         </div>
       )}
       {product === "supersummary" && (
