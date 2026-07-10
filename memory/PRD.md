@@ -164,8 +164,8 @@ session + onboarding data preserved.
   to "Customize AI Instructions" per testing agent's design-issue note.
 
 ## Known Issues / Backlog
-- **P2 (refactor, not urgent):** App.jsx (~3260 lines) and SuperSummary.jsx (~2287 lines) remain
-  monolithic — recommend splitting into per-component files in a future pass.
+- **RESOLVED (Feb 2026):** ~~App.jsx and SuperSummary.jsx monolithic~~ — fully refactored into 21
+  focused files, see below.
 - **P1 (setup, not a bug):** No admin AI provider key configured yet — sign in as
   `adityasonofashok@gmail.com` (Google) and add a real key via Profile → Settings for AI-backed
   chat/vision generation to work end-to-end. Local/offline note generation works without it.
@@ -174,12 +174,46 @@ session + onboarding data preserved.
   30 cases/day; referral bonus of +5 summaries/+10 cases per month for referrers) — user pivoted to
   report the 5 bugs/features above before answering clarifying questions on exact quota/referral
   logic and payment gateway (Razorpay suggested for INR). Revisit next session.
-- **User reported a production deployment failure** (Cloud Build error) in a system notification
-  during this session — not yet raised with the user or investigated, since preview environment is
-  unaffected and the user redirected attention to the 5 bugs/features above.
+- **RESOLVED (Feb 2026):** Production deployment failure investigated via `deployment_agent` —
+  found and fixed 2 WARN-level issues (hardcoded CORS origin, hardcoded storage URL). See below.
+
+## [Feb 2026] App.jsx / SuperSummary.jsx file-split refactor — IMPLEMENTED
+User approved finishing the code-organization refactor (P2 backlog item above) plus a deployment
+readiness check. Both complete and tested.
+
+- **Deployment fixes (2 WARNs from `deployment_agent` static scan):** `backend/.env`
+  `CORS_ORIGINS` changed from a hardcoded specific preview origin to `"*"`; `backend/storage.py`'s
+  hardcoded `STORAGE_URL` now built from the platform-injected `INTEGRATION_PROXY_URL` env var
+  instead of a literal string. Both verified via backend restart + curl.
+- **App.jsx refactor (3260 → 288 lines):** extracted `LibraryScreen.jsx`, `PDFReader.jsx`,
+  `TagLibraryModal.jsx`, `ConsultationScreen.jsx` (bundles its only-used-there helpers
+  `PageViewer`/`DiagnosisSidebar`/`SuperTagsCard`/`DifferentialsPanel`/`OptionButton`),
+  `NoteScreen.jsx`. `App.jsx` now only holds the root component wiring `product`/`phase` routing.
+  `SuperMemoryPage.jsx` updated to import `PDFReader`/`TagLibraryModal` from their new dedicated
+  files instead of `App.jsx` (removes a fragile cross-file dependency).
+- **SuperSummary.jsx refactor (2373 → 196 lines):** extracted `SuperSummaryShared.jsx` (shared
+  theme consts + `Btn`/`Card`/`inputS`), `DocumentIntake.jsx`, `SafetyCheckPanel.jsx`,
+  `SaveAsTemplateModal.jsx`, `TemplateEditor.jsx`, `TemplateLibrary.jsx` (bundles
+  `HowToUseCarousel`), `AiModeCard.jsx`, `FillScreen.jsx`, `SuperFastAiWizard.jsx`,
+  `AIModeScreen.jsx`. `ConsultationScreen.jsx` now imports `DocumentIntake` from its own file
+  instead of reaching into `SuperSummary.jsx`. Dropped one dead/unused helper
+  (`extractDateFromText`) found during extraction — was defined but never called.
+  `SuperSummary.jsx` now only holds the root component wiring `phase` routing.
+  All dead/unused imports left over from earlier partial extractions (`PROVIDERS`,
+  `getGenericInstructions`/`getDetailedInstructions` at the App root level, `RecordsModal`,
+  `AdminDashboard`, `listCommunityWorkflows`, `rateWorkflow`, `uploadBook`, `deleteBook`, `PURPLE`,
+  `CATEGORIES`, `initPDFJS`, `renderPDFPage`, `extractAllText`, `WorkflowEditor`) were removed as a
+  side effect of rewriting `App.jsx`'s import block from scratch.
+- Verified via `yarn build` (production build, 0 errors — confirms every import/export across all
+  21 files resolves correctly) + testing_agent_v4 (iteration_9.json): 100% pass, 0 regressions,
+  full ClinicFlow (library→consult→note) and SuperSummary (template library→fill/wizard→editor)
+  flows re-verified end-to-end on desktop + mobile viewports post-refactor.
 
 ## Next Action Items
-- Await user testing/confirmation of the 5 fixes above on their own devices.
+- Await user testing/confirmation of the refactor + the earlier 5 mobile/auth/SuperMemory fixes.
 - Resume the payment/subscription clarification questions (quota logic, referral trigger,
   Razorpay vs other gateway, recurring vs one-time pass, upgrade-prompt UX) when user is ready.
-- Investigate/report the production deployment failure if the user brings it up.
+- Optional/minor (found by testing agent, not a regression): reword pediatric-specific question
+  phrasing in the offline "Fever — General" complaint bank to be age-neutral.
+- Optional: create an email/password admin test account (current real admin is Google-OAuth-only)
+  to make future Admin Dashboard regression testing automatable.
