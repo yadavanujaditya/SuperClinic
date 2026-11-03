@@ -27,3 +27,4 @@ dist-ssr
 .firebase/
 *-debug.log
 .env
+e2e/screenshots/

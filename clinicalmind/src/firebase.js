@@ -8,6 +8,7 @@ import {
   initializeFirestore, connectFirestoreEmulator,
   persistentLocalCache, persistentMultipleTabManager,
 } from "firebase/firestore";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 const env = import.meta.env;
 const useEmulators = env.VITE_USE_EMULATORS === "true";
@@ -28,6 +29,7 @@ export const usingEmulators = firebaseEnabled && useEmulators;
 
 export let auth = null;
 export let db = null;
+export let functions = null;
 
 if (firebaseEnabled) {
   const app = initializeApp(config);
@@ -36,9 +38,11 @@ if (firebaseEnabled) {
   db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
+  functions = getFunctions(app, "asia-south1");
   if (useEmulators) {
     const host = env.VITE_EMULATOR_HOST || "127.0.0.1";
     connectAuthEmulator(auth, `http://${host}:9099`, { disableWarnings: true });
     connectFirestoreEmulator(db, host, 8080);
+    connectFunctionsEmulator(functions, host, 5001);
   }
 }

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import AgentStudio from "./agent/AgentStudio.jsx";
 import { SYSTEM_TEMPLATES, emptyTemplate, parseTemplateParts, fillTemplate, SECTION_SEQUENCE } from "./templates.js";
 import { extractDocumentText } from "./ocr.js";
 import { callAIStream, parseJSON, getGenericInstructions, getDetailedInstructions } from "./api.js";
@@ -26,7 +27,7 @@ const inputS = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--
 async function fileToDataURL(file) {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
 }
-async function extractPdfTextQuick(file) {
+export async function extractPdfTextQuick(file) {
   if (!window.pdfjsLib) {
     await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
@@ -2101,7 +2102,7 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
 // ─── SuperSummary root ──────────────────────────────────────────────────────────
 // customTemplates/upsertTemplate/removeTemplate come from useSyncedList in App (always mounted, so sync runs app-wide)
 export default function SuperSummary({ provider, apiKey, setSettingsOpen, customTemplates, upsertTemplate, removeTemplate }) {
-  const [phase, setPhase] = useState("library"); // library | fill | ai | ai_wizard
+  const [phase, setPhase] = useState("library"); // library | fill | ai | ai_wizard | agent
   const [editing, setEditing] = useState(undefined);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [aiComplaint, setAiComplaint] = useState("");
@@ -2128,6 +2129,10 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen, custom
 
   return (
     <div style={{ minHeight: "100vh" }}>
+      {phase === "agent" && (
+        <AgentStudio onBack={() => setPhase("library")} provider={provider} apiKey={apiKey}
+          templates={[...SYSTEM_TEMPLATES, ...customTemplates].filter(t => t.sampleBody)} />
+      )}
       {phase === "library" && (
         <div style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 16px" }}>
           {!apiKey && (
@@ -2139,6 +2144,17 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen, custom
               </p>
             </div>
           )}
+          <div data-testid="open-agent" onClick={() => setPhase("agent")} role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === "Enter") setPhase("agent"); }}
+            style={{ cursor: "pointer", marginBottom: 16, borderRadius: 14, padding: "16px 18px", color: "#fff", display: "flex", alignItems: "center", gap: 14,
+              background: "linear-gradient(120deg,#4c1d95,#7c3aed 60%,#a855f7)", boxShadow: "0 8px 24px rgba(124,58,237,0.28)" }}>
+            <span style={{ fontSize: 30 }}>🧠</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>My Agent — learns how you write summaries</p>
+              <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#ede9fe" }}>Teach it with your past summaries. It drafts new ones in your style and shows the source of every line.</p>
+            </div>
+            <span style={{ fontWeight: 800, fontSize: 18 }}>→</span>
+          </div>
           <Card>
             <TemplateLibrary customTemplates={customTemplates} onEdit={openEdit} onDelete={deleteTemplate} hasKey={!!apiKey}
               onSelect={t => { setSelectedTemplateForOptions(t); }}

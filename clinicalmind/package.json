@@ -8,9 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "emulators": "firebase emulators:start --only auth,firestore --project demo-superclinic",
+    "emulators": "firebase emulators:start --only auth,firestore,functions --project demo-superclinic",
     "emulators:hosting": "npm run build && firebase emulators:start --project demo-superclinic",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore"
+    "deploy": "npm run build && firebase deploy --only hosting,firestore,functions"
   },
   "dependencies": {
     "firebase": "^12.19.0",

@@ -1,0 +1,5 @@
+node_modules/
+.secret.local
+.runtimeconfig.json
+*.log
+.env.local

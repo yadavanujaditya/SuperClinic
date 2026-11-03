@@ -1,22 +1,27 @@
 rules_version = '2';
 
 // Each doctor can only read and write their own data under users/{uid}.
-// Nobody (not even other signed-in users) can see another doctor's data.
+// Nobody else (not even other signed-in users) can see another doctor's data.
+// Some collections are written only by Cloud Functions (Admin SDK bypasses rules):
+//   summaries (created only after server-side de-identification), agentRuns, usage.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isOwner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
+    // Only these keys may change in this write (server-managed keys stay untouched).
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource == null ? {} : resource.data).affectedKeys().hasOnly(keys);
+    }
 
     // Profile + preferences: users/{uid}
     match /users/{uid} {
-      allow read, delete: if isOwner(uid);
+      allow read: if isOwner(uid);
       allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(
-             ['provider', 'instructionsGeneric', 'instructionsDetailed', 'email', 'updatedAt']);
+        && onlyChanges(['provider', 'instructionsGeneric', 'instructionsDetailed', 'email', 'updatedAt', 'autoLearn']);
 
-      // Custom complaints and SuperSummary templates
+      // Synced custom complaints and SuperSummary templates
       match /{kind}/{itemId} {
         allow read, delete: if isOwner(uid) && kind in ['complaints', 'templates'];
         allow create, update: if isOwner(uid)
@@ -24,6 +29,40 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['json', 'name', 'createdMs', 'updatedAt'])
           && request.resource.data.json is string
           && request.resource.data.json.size() < 900000;
+      }
+
+      // Past summaries the agent learns from. Created by the addSummaries function only.
+      // The doctor may re-classify (category / consultant label) or delete them.
+      match /summaries/{id} {
+        allow read, delete: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && onlyChanges(['category', 'categorySource', 'doctorLabel'])
+          && (!('category' in request.resource.data) || request.resource.data.category == null
+              || (request.resource.data.category is string && request.resource.data.category.size() <= 80))
+          && (!('categorySource' in request.resource.data) || request.resource.data.categorySource in ['doctor', null]);
+      }
+
+      // The agent's memory files. The doctor can read, correct, add and delete them.
+      match /memories/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['path', 'content', 'updatedAt', 'updatedBy'])
+          && request.resource.data.path is string
+          && request.resource.data.path.matches('^/memories/[A-Za-z0-9_./-]{1,180}$')
+          && !request.resource.data.path.matches('.*\\.\\..*')
+          && id == request.resource.data.path.replace('/', '%2F')
+          && request.resource.data.content is string
+          && request.resource.data.content.size() <= 24000
+          && request.resource.data.updatedBy == 'doctor'
+          && (resource == null || resource.data.path == request.resource.data.path);
+      }
+
+      // Learning / drafting runs and daily usage counters — written by the server only.
+      match /agentRuns/{id} {
+        allow read: if isOwner(uid);
+      }
+      match /usage/{day} {
+        allow read: if isOwner(uid);
       }
     }
 
