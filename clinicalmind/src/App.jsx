@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useAuth, useSyncedList, usePrefsSync, savePrefs, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut, friendlyAuthError, LS } from "./auth.jsx";
+import { usingEmulators } from "./firebase.js";
 import { BM25, chunkText, buildRetrievalQuery, highlightTerms } from "./bm25.js";
 import { PROVIDERS, getProvider, callAIStream, parseJSON, buildSystemPrompt, buildNotePrompt, generateLocalNote, getGenericInstructions, getDetailedInstructions } from "./api.js";
 import { SYSTEM_COMPLAINTS } from "./complaints.js";
@@ -187,8 +189,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
   };
 
   const saveInstructions = () => {
-    localStorage.setItem("clinicalmind:instructions:generic", genericInst);
-    localStorage.setItem("clinicalmind:instructions:detailed", detailedInst);
+    savePrefs({ instructionsGeneric: genericInst, instructionsDetailed: detailedInst });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -213,7 +214,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
           <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", display: "block", marginBottom: 8 }}>AI Provider</label>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {PROVIDERS.map(pr => (
-              <button key={pr.id} onClick={() => { setProvider(pr.id); localStorage.setItem("clinicalmind:provider", pr.id); }}
+              <button key={pr.id} onClick={() => setProvider(pr.id)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-sans)",
                   border: `1.5px solid ${provider === pr.id ? TEAL.primary : "var(--color-border-primary)"}`,
                   background: provider === pr.id ? TEAL.bg : "#fff", color: provider === pr.id ? TEAL.primary : "var(--color-text-primary)" }}>
@@ -278,8 +279,7 @@ function SettingsPanel({ open, onClose, provider, setProvider, currentKey, setCu
             <button
               onClick={() => {
                 if (window.confirm("Are you sure you want to reset instructions to default?")) {
-                  localStorage.removeItem("clinicalmind:instructions:generic");
-                  localStorage.removeItem("clinicalmind:instructions:detailed");
+                  savePrefs({ instructionsGeneric: null, instructionsDetailed: null });
                   setGenericInst(getGenericInstructions());
                   setDetailedInst(getDetailedInstructions());
                   setSaved(true);
@@ -1074,33 +1074,102 @@ function ProductToggle({ product, setProduct }) {
 }
 
 // ─── Profile Modal ────────────────────────────────────────────────────────────
+function AccountBox() {
+  const { user, ready, enabled } = useAuth();
+  const [mode, setMode] = useState("signin"); // signin | signup
+  const [email, setEmail] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  if (!enabled) {
+    return (
+      <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
+        No account needed — your data and API keys stay on this device.
+      </p>
+    );
+  }
+  if (!ready) return <p style={{ fontSize: 12, textAlign: "center", margin: "14px 0 0", color: "var(--color-text-secondary)" }}>Checking sign-in…</p>;
+
+  const run = async (fn) => {
+    setBusy(true); setErr("");
+    try { await fn(); } catch (e) { setErr(friendlyAuthError(e)); } finally { setBusy(false); }
+  };
+  const inputS = { width: "100%", padding: "9px 12px", border: "1.5px solid var(--color-border-primary)", borderRadius: 8, fontSize: 13.5, outline: "none", boxSizing: "border-box", fontFamily: "var(--font-sans)" };
+
+  if (user) {
+    return (
+      <div style={{ marginTop: 14, textAlign: "center" }}>
+        <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: 0 }}>
+          ☁️ Your complaints, templates and settings sync across your devices. API keys stay on this device.
+        </p>
+        <button data-testid="sign-out" disabled={busy} onClick={() => run(signOut)}
+          style={{ width: "100%", marginTop: 12, padding: "10px", borderRadius: 10, border: `1.5px solid ${RED.primary}`, background: "#fff", color: RED.primary, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "0 0 10px", textAlign: "center" }}>
+        Sign in to back up your complaints & templates and use them on any device.
+      </p>
+      <button data-testid="google-sign-in" disabled={busy} onClick={() => run(signInWithGoogle)}
+        style={{ width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid var(--color-border-primary)", background: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+        <span style={{ fontWeight: 800, color: "#4285F4" }}>G</span> Continue with Google
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0", fontSize: 11, color: "var(--color-text-secondary)" }}>
+        <div style={{ flex: 1, height: 1, background: "var(--color-border-primary)" }} />or<div style={{ flex: 1, height: 1, background: "var(--color-border-primary)" }} />
+      </div>
+      <form onSubmit={e => { e.preventDefault(); run(() => mode === "signin" ? signInWithEmail(email.trim(), pw) : signUpWithEmail(email.trim(), pw)); }}
+        style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <input data-testid="email" type="email" required placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} style={inputS} autoComplete="email" />
+        <input data-testid="password" type="password" required minLength={6} placeholder="Password (min 6 characters)" value={pw} onChange={e => setPw(e.target.value)} style={inputS} autoComplete={mode === "signin" ? "current-password" : "new-password"} />
+        {err && <p data-testid="auth-error" style={{ fontSize: 12, color: RED.primary, margin: 0 }}>{err}</p>}
+        <button data-testid="email-submit" type="submit" disabled={busy}
+          style={{ padding: "10px", borderRadius: 10, border: "none", background: TEAL.primary, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+        </button>
+      </form>
+      <button onClick={() => { setMode(m => m === "signin" ? "signup" : "signin"); setErr(""); }}
+        style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: TEAL.primary, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+        {mode === "signin" ? "New here? Create an account" : "Already have an account? Sign in"}
+      </button>
+      {usingEmulators && <p style={{ fontSize: 10.5, color: AMBER.text, background: AMBER.bg, borderRadius: 6, padding: "5px 8px", margin: "8px 0 0", textAlign: "center" }}>Local test mode (Firebase emulators)</p>}
+    </div>
+  );
+}
+
 function ProfileModal({ onClose, onSettings }) {
+  const { user } = useAuth();
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} className="anim-fade">
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, overflow: "hidden", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
+      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 380, maxHeight: "92vh", overflowY: "auto", boxShadow: "0 30px 70px rgba(0,0,0,0.3)" }} className="anim-fade-up">
         <div style={{ background: "linear-gradient(120deg,#0d9488,#14b8a6)", padding: "32px 24px 46px", position: "relative" }}>
           <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "rgba(255,255,255,0.2)", border: "none", borderRadius: "50%", width: 28, height: 28, color: "#fff", fontSize: 15, cursor: "pointer" }}>✕</button>
-          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>🧑‍⚕️</div>
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, margin: "0 auto", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+            {user?.photoURL ? <img src={user.photoURL} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} referrerPolicy="no-referrer" /> : "🧑‍⚕️"}
+          </div>
         </div>
-        <div style={{ padding: "0 24px 24px", marginTop: -28 }}>
+        <div style={{ padding: "0 24px 24px", marginTop: -28, position: "relative" }}>
           <div style={{ background: "#fff", borderRadius: 14, boxShadow: "0 10px 30px rgba(0,0,0,0.08)", padding: 18, textAlign: "center" }}>
-            <p style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px" }}>Attending Doctor</p>
-            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>Indian Government Hospital OPD</p>
+            <p data-testid="profile-name" style={{ fontSize: 16, fontWeight: 800, margin: "0 0 2px", wordBreak: "break-word" }}>{user ? (user.displayName || user.email) : "Attending Doctor"}</p>
+            <p style={{ fontSize: 12.5, color: "var(--color-text-secondary)", margin: 0 }}>{user ? (user.displayName ? user.email : "Signed in") : "Not signed in"}</p>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <div style={{ flex: 1, background: TEAL.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>🔒</p>
-              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>On-device only</p>
+              <p style={{ fontSize: 18, fontWeight: 800, color: TEAL.primary, margin: 0 }}>{user ? "☁️" : "🔒"}</p>
+              <p style={{ fontSize: 10.5, color: TEAL.text, margin: "3px 0 0", fontWeight: 600 }}>{user ? "Cloud sync on" : "On-device only"}</p>
             </div>
             <div style={{ flex: 1, background: PURPLE.bg, borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
               <p style={{ fontSize: 18, fontWeight: 800, color: PURPLE.primary, margin: 0 }}>⚡</p>
               <p style={{ fontSize: 10.5, color: PURPLE.text, margin: "3px 0 0", fontWeight: 600 }}>v1.0 ClinicFlow</p>
             </div>
           </div>
-          <p style={{ fontSize: 12, color: "var(--color-text-secondary)", lineHeight: 1.6, margin: "14px 0 0", textAlign: "center" }}>
-            No account needed — your patient data and API keys never leave this device.
-          </p>
-          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 16, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          <AccountBox />
+          <button onClick={() => { onClose(); onSettings(); }} style={{ width: "100%", marginTop: 12, padding: "11px", borderRadius: 10, border: "none", background: "var(--color-text-primary)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             ⚙️ Open Settings
           </button>
         </div>
@@ -1111,6 +1180,7 @@ function ProfileModal({ onClose, onSettings }) {
 
 // ─── Profile Menu ─────────────────────────────────────────────────────────────
 function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const ref = useRef();
@@ -1128,16 +1198,18 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen(v => !v)}
-        style={{ width: 38, height: 38, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
+      <button data-testid="profile-button" onClick={() => setOpen(v => !v)}
+        style={{ width: 38, height: 38, padding: 0, overflow: "hidden", borderRadius: "50%", border: "2px solid rgba(255,255,255,0.6)", background: "linear-gradient(135deg,#fff,#f0fdfa)",
           display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
-        🧑‍⚕️
+        {user?.photoURL
+          ? <img src={user.photoURL} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />
+          : user ? <span style={{ fontWeight: 800, color: TEAL.primary }}>{(user.displayName || user.email || "?")[0].toUpperCase()}</span> : "🧑‍⚕️"}
       </button>
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", borderRadius: 12,
           border: "1px solid var(--color-border-primary)", boxShadow: "0 8px 30px rgba(0,0,0,0.15)", minWidth: 200, overflow: "hidden", zIndex: 60 }}>
           <button onClick={() => { setOpen(false); setShowProfile(true); }} style={itemS}>
-            <span>👤 View Profile</span>
+            <span>{user ? "👤 Account" : "👤 Sign in / Profile"}</span>
           </button>
           <div style={{ height: 1, background: "var(--color-border-primary)" }} />
           <button onClick={() => { setOpen(false); onTagLibrary(); }} style={itemS}>
@@ -1156,7 +1228,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
 }
 
 // ─── Library Screen ───────────────────────────────────────────────────────────
-function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdfDocs, customComplaints, setCustomComplaints, setSettingsOpen, tagLibrary, setTagLibrary, pdfBuffers, product, setProduct }) {
+function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdfDocs, customComplaints, upsertComplaint, setSettingsOpen, tagLibrary, setTagLibrary, pdfBuffers, product, setProduct }) {
   const [selected, setSelected] = useState(null);
   const [ageValue, setAgeValue] = useState("");
   const [ageUnit, setAgeUnit] = useState("years");
@@ -1193,11 +1265,7 @@ function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdf
   const removeTag = (tagId) => setTagLibrary(prev => prev.filter(t => t.id !== tagId));
 
   const saveComplaint = (c) => {
-    const prev = JSON.parse(localStorage.getItem("clinicalmind:complaints") || "[]");
-    const i = prev.findIndex(p => p.id === c.id);
-    const next = i >= 0 ? prev.map((p, j) => j === i ? c : p) : [...prev, c];
-    localStorage.setItem("clinicalmind:complaints", JSON.stringify(next));
-    setCustomComplaints(next);
+    upsertComplaint(c);
     setEditing(undefined);
   };
 
@@ -2791,8 +2859,11 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [noteData, setNoteData] = useState(null);
   const [pdfDocs, setPdfDocs] = useState([]);
-  const [customComplaints, setCustomComplaints] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("clinicalmind:complaints") || "[]"); } catch { return []; }
+  const [customComplaints, upsertComplaint] = useSyncedList("complaints", LS.complaints);
+  const [customTemplates, upsertTemplate, removeTemplate] = useSyncedList("templates", LS.templates);
+  // Cloud prefs (provider, custom instructions) → local state when signed in
+  usePrefsSync((prefs) => {
+    if (prefs.provider && prefs.provider !== provider) { setProvider(prefs.provider); setApiKey(apiKeyFor(prefs.provider)); }
   });
   const [tagLibrary, setTagLibrary] = useState([]);
   const pdfBuffers = useRef(new Map());
@@ -2801,7 +2872,7 @@ export default function App() {
   const handleProviderChange = (id) => {
     setProvider(id);
     setApiKey(apiKeyFor(id));
-    localStorage.setItem("clinicalmind:provider", id);
+    savePrefs({ provider: id });
   };
 
   const handleKeyChange = (key) => {
@@ -2982,7 +3053,7 @@ export default function App() {
               <ProfileMenu onSettings={() => setSettingsOpen(true)} onTagLibrary={() => setProduct("clinicalmind")} tagCount={tagLibrary.length} />
             </div>
           </div>
-          <SuperSummary provider={provider} apiKey={apiKey} setSettingsOpen={setSettingsOpen} />
+          <SuperSummary provider={provider} apiKey={apiKey} setSettingsOpen={setSettingsOpen} customTemplates={customTemplates} upsertTemplate={upsertTemplate} removeTemplate={removeTemplate} />
         </div>
       )}
       {product === "clinicalmind" && phase === "library" && (
@@ -2995,7 +3066,7 @@ export default function App() {
           pdfDocs={pdfDocs}
           setPdfDocs={setPdfDocs}
           customComplaints={customComplaints}
-          setCustomComplaints={setCustomComplaints}
+          upsertComplaint={upsertComplaint}
           setSettingsOpen={setSettingsOpen}
           tagLibrary={tagLibrary}
           setTagLibrary={setTagLibrary}

@@ -2099,11 +2099,9 @@ function AIModeScreen({ complaint, provider, apiKey, onCancel, onDone }) {
 }
 
 // ─── SuperSummary root ──────────────────────────────────────────────────────────
-export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
+// customTemplates/upsertTemplate/removeTemplate come from useSyncedList in App (always mounted, so sync runs app-wide)
+export default function SuperSummary({ provider, apiKey, setSettingsOpen, customTemplates, upsertTemplate, removeTemplate }) {
   const [phase, setPhase] = useState("library"); // library | fill | ai | ai_wizard
-  const [customTemplates, setCustomTemplates] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("clinicalmind:templates") || "[]"); } catch { return []; }
-  });
   const [editing, setEditing] = useState(undefined);
   const [activeTemplate, setActiveTemplate] = useState(null);
   const [aiComplaint, setAiComplaint] = useState("");
@@ -2119,19 +2117,12 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
   const saveTemplate = (t) => {
     const now = new Date().toISOString();
     const rec = { ...t, id: t.id || (t.name || "template").toLowerCase().replace(/\s+/g, "_") + "_" + Date.now(), source: "private", createdAt: t.createdAt || now, editedAt: now };
-    const prev = JSON.parse(localStorage.getItem("clinicalmind:templates") || "[]");
-    const i = prev.findIndex(p => p.id === rec.id);
-    const next = i >= 0 ? prev.map((p, j) => j === i ? rec : p) : [...prev, rec];
-    localStorage.setItem("clinicalmind:templates", JSON.stringify(next));
-    setCustomTemplates(next);
+    upsertTemplate(rec);
     setEditing(undefined);
   };
 
   const deleteTemplate = (id) => {
-    const prev = JSON.parse(localStorage.getItem("clinicalmind:templates") || "[]");
-    const next = prev.filter(t => t.id !== id);
-    localStorage.setItem("clinicalmind:templates", JSON.stringify(next));
-    setCustomTemplates(next);
+    removeTemplate(id);
     setEditing(undefined);
   };
 
@@ -2231,9 +2222,7 @@ export default function SuperSummary({ provider, apiKey, setSettingsOpen }) {
               createdAt: now,
               editedAt: now
             };
-            const prev = JSON.parse(localStorage.getItem("clinicalmind:templates") || "[]");
-            localStorage.setItem("clinicalmind:templates", JSON.stringify([...prev, newT]));
-            setCustomTemplates([...prev, newT]);
+            upsertTemplate(newT);
             setEditing(newT);
             setPhase("library");
             setActiveTemplate(null);

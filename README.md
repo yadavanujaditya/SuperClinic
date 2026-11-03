@@ -19,9 +19,12 @@ As a pediatrics resident handling ward admissions, I spent hours writing dischar
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | JavaScript |
-| AI/LLM | AI-powered generation |
-| Backend | Node.js |
+| Frontend | React + Vite (`clinicalmind/`) |
+| AI/LLM | Claude, Gemini, OpenAI or DeepSeek, called from the browser with the doctor's own key |
+| Backend | Firebase: Auth (Google + email login) and Firestore (cloud sync of complaints, templates, settings) |
+| Hosting | Firebase Hosting |
+
+Backend setup, local testing with the Firebase emulators, and deployment: see [`clinicalmind/FIREBASE.md`](clinicalmind/FIREBASE.md).
 
 ## Who It's For
 

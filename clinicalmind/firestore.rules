@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Each doctor can only read and write their own data under users/{uid}.
+// Nobody (not even other signed-in users) can see another doctor's data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Profile + preferences: users/{uid}
+    match /users/{uid} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(
+             ['provider', 'instructionsGeneric', 'instructionsDetailed', 'email', 'updatedAt']);
+
+      // Custom complaints and SuperSummary templates
+      match /{kind}/{itemId} {
+        allow read, delete: if isOwner(uid) && kind in ['complaints', 'templates'];
+        allow create, update: if isOwner(uid)
+          && kind in ['complaints', 'templates']
+          && request.resource.data.keys().hasOnly(['json', 'name', 'createdMs', 'updatedAt'])
+          && request.resource.data.json is string
+          && request.resource.data.json.size() < 900000;
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

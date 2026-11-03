@@ -7,9 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-superclinic",
+    "emulators:hosting": "npm run build && firebase emulators:start --project demo-superclinic",
+    "deploy": "npm run build && firebase deploy --only hosting,firestore"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -17,6 +21,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
+    "firebase-tools": "^15.34.2",
     "oxlint": "^1.69.0",
     "vite": "^8.1.0"
   }
