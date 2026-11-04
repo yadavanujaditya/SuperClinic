@@ -79,6 +79,42 @@ function draftTurn(body) {
   })];
 }
 
+// Notebook mode: search, read a page, answer with verbatim quotes (+ one false quote).
+function notebookTurn(body) {
+  const t = assistantTurns(body.messages);
+  const first = typeof body.messages[0].content === "string" ? body.messages[0].content : "";
+  const complaints = ((first.match(/Doctor's question: (.+)/) || first.match(/Complaints: (.+)/) || [])[1] || "fever").trim();
+  if (t === 0) return [text("Searching the books."), tu("search_books", { query: complaints })];
+  const results = body.messages.flatMap(m => Array.isArray(m.content) ? m.content : []).filter(b => b.type === "tool_result").map(resultText).join("\n\n");
+  const passages = [...results.matchAll(/\[(B\d+-p\d+-\d+)\][^\n]*\n([^\[]+)/g)].map(m => ({ id: m[1], text: m[2].replace(/\n---\s*$/, "").trim() }));
+  if (t === 1) return [tu("search_books", { query: "danger signs chest indrawing " + complaints }), tu("read_page", { passage_id: passages[0]?.id || "B1-p1-1" })];
+  const sentence = (re) => {
+    for (const p of passages) {
+      const s = p.text.split(/(?<=\.)\s+/).find(x => re.test(x));
+      if (s) return { id: p.id, quote: s.split(" ").slice(0, 24).join(" ").replace(/\.$/, "") };
+    }
+    return null;
+  };
+  const cite = (re, textOut) => { const s = sentence(re); return s ? { text: textOut, citations: [{ passage_id: s.id, quote: s.quote }] } : null; };
+  const diffs = [
+    [/bronchiolitis/i, "Acute bronchiolitis", "high"],
+    [/pneumonia/i, "Pneumonia", "medium"],
+    [/enteric/i, "Enteric fever", "medium"],
+    [/tuberculosis/i, "Tuberculosis", "low"],
+  ].map(([re, name, likelihood]) => {
+    const pt = cite(re, `Fits the picture of ${name.toLowerCase()} in this child`);
+    return pt ? { name, likelihood, points: [pt] } : null;
+  }).filter(Boolean);
+  if (diffs[0] && passages[0]) diffs[0].points.push({ text: "Antibiotics are always required", citations: [{ passage_id: passages[0].id, quote: "antibiotics are always required for every child with cough" }] });
+  return [tu("submit_answer", {
+    summary: [cite(/cough|fever/i, "The books link these complaints to the conditions below"), cite(/breathing|respiratory rate/i, "Count the respiratory rate to look for fast breathing")].filter(Boolean),
+    differentials: diffs,
+    ask_next: [cite(/blood culture|investigation/i, "Consider the investigation the book recommends"), { text: "Ask about sick contacts at home", citations: [] }].filter(Boolean),
+    red_flags: [cite(/danger|indrawing|cyanosis/i, "Look for danger signs")].filter(Boolean),
+    not_in_books: ["Local antibiotic resistance patterns"],
+  })];
+}
+
 function respond(res, content) {
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   const stop = content.some(b => b.type === "tool_use") ? "tool_use" : "end_turn";
@@ -107,7 +143,8 @@ http.createServer((req, res) => {
     try {
       const body = JSON.parse(raw);
       const system = typeof body.system === "string" ? body.system : JSON.stringify(body.system);
-      const content = system.includes("LEARN how this doctor") ? learnTurn(body) : draftTurn(body);
+      const content = system.includes("LEARN how this doctor") ? learnTurn(body)
+        : system.includes("personal notebook") ? notebookTurn(body) : draftTurn(body);
       // Small delay so the UI's live progress is visible.
       setTimeout(() => respond(res, content), 400);
     } catch (e) {

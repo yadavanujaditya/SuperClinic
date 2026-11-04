@@ -7,6 +7,7 @@ import { SYSTEM_COMPLAINTS } from "./complaints.js";
 import SuperSummary, { DocumentIntake } from "./SuperSummary.jsx";
 import HomeHero, { CardCarousel, IllustConsult, IllustDifferential, IllustDocs, IllustScan, IllustLibrary, IllustSafety, IllustGame, IllustDnb, IllustSpeed, AppFooter } from "./HomeHero.jsx";
 import SpeedMD from "./SpeedMD.jsx";
+import Notebook from "./notebook/Notebook.jsx";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const TEAL  = { primary: "#0d9488", light: "#14b8a6", bg: "#f0fdfa", border: "#99f6e4", text: "#115e59" };
@@ -1228,7 +1229,7 @@ function ProfileMenu({ onSettings, onTagLibrary, tagCount }) {
 }
 
 // ─── Library Screen ───────────────────────────────────────────────────────────
-function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdfDocs, customComplaints, upsertComplaint, setSettingsOpen, tagLibrary, setTagLibrary, pdfBuffers, product, setProduct }) {
+function LibraryScreen({ onStart, hasKey, provider, apiKey, idx, pdfDocs, setPdfDocs, customComplaints, upsertComplaint, setSettingsOpen, tagLibrary, setTagLibrary, pdfBuffers, product, setProduct, onOpenNotebook }) {
   const [selected, setSelected] = useState(null);
   const [ageValue, setAgeValue] = useState("");
   const [ageUnit, setAgeUnit] = useState("years");
@@ -1348,6 +1349,17 @@ Return ONLY valid JSON with this exact structure:
           </div>
         </div>
 
+        <div data-testid="open-notebook" role="button" tabIndex={0} onClick={() => onOpenNotebook({})}
+          onKeyDown={e => { if (e.key === "Enter") onOpenNotebook({}); }}
+          style={{ cursor: "pointer", marginBottom: 16, borderRadius: 14, padding: "14px 18px", color: "#fff", display: "flex", alignItems: "center", gap: 14,
+            background: "linear-gradient(120deg,#0f766e,#0d9488 55%,#14b8a6)", boxShadow: "0 8px 24px rgba(13,148,136,0.25)" }}>
+          <span style={{ fontSize: 28 }}>📓</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: 15.5, fontWeight: 800 }}>Notebook — ask your own books</p>
+            <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#ccfbf1" }}>Type the complaints ("cough 5 days, fever 10 days"). Get differentials, questions to ask and red flags — each with the book, page and exact text.</p>
+          </div>
+          <span style={{ fontWeight: 800, fontSize: 18 }}>→</span>
+        </div>
         <div className="library-grid">
           <Card><DocumentVault pdfDocs={pdfDocs} setPdfDocs={setPdfDocs} idx={idx} tagLibrary={tagLibrary} setTagLibrary={setTagLibrary} pdfBuffers={pdfBuffers}
             onOpenReader={(doc, initPage) => setReaderState({ doc, initPage: initPage || 1 })}
@@ -2291,7 +2303,7 @@ function OptionButton({ label, onClick }) {
 }
 
 // ─── Consultation Screen ──────────────────────────────────────────────────────
-function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tagLibrary, pdfBuffers, setSettingsOpen }) {
+function ConsultationScreen({ session, idx, provider, apiKey, onEnd, onNote, tagLibrary, pdfBuffers, setSettingsOpen, onOpenNotebook }) {
   const { complaint, age, sex, aiOnly, opdMode } = session;
   const complaintTags = (complaint.tagRefs || []).map(id => tagLibrary.find(t => t.id === id)).filter(Boolean);
 
@@ -2563,6 +2575,10 @@ Rules:
         {aiOnly && <Badge color={{ bg: "#4c1d95", text: "#F3E8FF", border: "#A855F7" }}>✨ AI Mode</Badge>}
         {retrieveMs && <span style={{ fontSize: 11, color: TEAL.primary, fontWeight: 600 }}>⚡ {retrieveMs}ms</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <Btn small variant="secondary" onClick={() => onOpenNotebook({
+            age: String(age || ""), sex: sex || "",
+            complaints: [complaint.name, ...history.filter(h => !String(h.q).startsWith("System:")).map(h => `${h.q} ${h.a}`)].join("; ").slice(0, 1500),
+          })}>📓 Ask my books</Btn>
           <Btn small variant="secondary" disabled={history.length < 4} onClick={() => onNote(history, differentials, redFlags)}>Generate Note</Btn>
           <Btn small variant="ghost" onClick={onEnd}>End</Btn>
         </div>
@@ -2856,6 +2872,7 @@ export default function App() {
   const [apiKey, setApiKey] = useState(() => apiKeyFor(localStorage.getItem("clinicalmind:provider") || "claude"));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [speedMdOpen, setSpeedMdOpen] = useState(false);
+  const [notebook, setNotebook] = useState(null); // null = closed, else prefill { age, sex, complaints }
   const [session, setSession] = useState(null);
   const [noteData, setNoteData] = useState(null);
   const [pdfDocs, setPdfDocs] = useState([]);
@@ -3059,6 +3076,7 @@ export default function App() {
       {product === "clinicalmind" && phase === "library" && (
         <LibraryScreen
           onStart={s => { setSession(s); setPhase("consultation"); }}
+          onOpenNotebook={setNotebook}
           hasKey={!!apiKey}
           provider={provider}
           apiKey={apiKey}
@@ -3086,8 +3104,10 @@ export default function App() {
           tagLibrary={tagLibrary}
           pdfBuffers={pdfBuffers}
           setSettingsOpen={setSettingsOpen}
+          onOpenNotebook={setNotebook}
         />
       )}
+      {notebook && <Notebook prefill={notebook} onClose={() => setNotebook(null)} />}
       {product === "clinicalmind" && phase === "note" && noteData && session && (
         <NoteScreen
           session={session}

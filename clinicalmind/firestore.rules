@@ -57,6 +57,23 @@ service cloud.firestore {
           && (resource == null || resource.data.path == request.resource.data.path);
       }
 
+      // The doctor's books for the ClinicFlow Notebook (private; page text only).
+      match /books/{bookId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['title', 'fileName', 'pageCount', 'textPages', 'status', 'createdAtMs', 'updatedAtMs'])
+          && request.resource.data.title is string && request.resource.data.title.size() <= 200
+          && request.resource.data.status in ['uploading', 'ready']
+          && request.resource.data.pageCount is int && request.resource.data.pageCount <= 5000;
+        match /shards/{shardId} {
+          allow read, delete: if isOwner(uid);
+          allow create, update: if isOwner(uid)
+            && request.resource.data.keys().hasOnly(['pages'])
+            && request.resource.data.pages is list
+            && request.resource.data.pages.size() <= 200;
+        }
+      }
+
       // Learning / drafting runs and daily usage counters — written by the server only.
       match /agentRuns/{id} {
         allow read: if isOwner(uid);

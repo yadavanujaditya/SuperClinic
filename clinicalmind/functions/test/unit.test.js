@@ -81,3 +81,53 @@ test("normalizePath confines paths to /memories", () => {
     assert.throws(() => normalizePath(bad), MemoryError, bad);
   }
 });
+
+// ── Notebook: book index + citation verification ──
+import { BookIndex, normText } from "../src/books.js";
+import { verifyNotebookAnswer } from "../src/notebook.js";
+
+const testIndex = () => new BookIndex([
+  { id: "bk1", title: "Handbook of Paediatrics", label: "B1", pages: new Map([
+    [12, "Acute bronchiolitis is a viral lower respiratory infection of infants under two years. It begins with coryza and low grade fever, followed by cough, fast breathing and wheeze. Respiratory syncytial virus is the commonest cause."],
+    [40, "Acute diarrhoea is the passage of three or more loose or watery stools in 24 hours. Assess dehydration and give oral rehydration solution with zinc for fourteen days."],
+  ]) },
+  { id: "bk2", title: "Fever Protocols", label: "B2", pages: new Map([
+    [3, "Enteric fever should be suspected in a child with fever for more than seven days. Blood culture is the investigation of choice in the first week of illness."],
+  ]) },
+]);
+
+test("book search maps everyday words to textbook terms", () => {
+  const idx = testIndex();
+  assert.equal(idx.search("loose motions")[0].id, "B1-p40-1");
+  assert.equal(idx.search("cold and fast breathing in a baby")[0].id, "B1-p12-1");
+  assert.equal(idx.search("fever for 10 days")[0].bookId, "bk2");
+  assert.deepEqual(idx.search("xyzzy"), []);
+});
+
+test("normText joins words hyphenated across PDF lines", () => {
+  assert.equal(normText("bron-  chiolitis\n is  common"), "bronchiolitis is common");
+});
+
+test("notebook citations are checked against the real page text", () => {
+  const idx = testIndex();
+  const seen = new Set(["B1-p12-1", "B2-p3-1"]);
+  const v = verifyNotebookAnswer({
+    summary: [{ text: "Likely bronchiolitis", citations: [{ passage_id: "B1-p12-1", quote: "It begins with coryza and low grade fever, followed by cough" }] }],
+    differentials: [{ name: "Enteric fever", likelihood: "medium", points: [
+      { text: "Fever > 7 days", citations: [{ passage_id: "B2-p3-1", quote: "fever for more than seven days" }] },
+      { text: "Widal is diagnostic", citations: [{ passage_id: "B2-p3-1", quote: "Widal test is diagnostic in the first week" }] },   // not in book
+      { text: "Give zinc", citations: [{ passage_id: "B1-p40-1", quote: "zinc for fourteen days" }] },                          // never retrieved
+      { text: "Made-up source", citations: [{ passage_id: "B9-p1-1", quote: "anything at all here" }] },                       // doesn't exist
+    ] }],
+    ask_next: [{ text: "Ask about vaccination", citations: [] }],
+    red_flags: [], not_in_books: ["Dengue NS1 timing"],
+  }, idx, seen);
+  assert.equal(v.summary[0].status, "verified");
+  assert.deepEqual(v.differentials[0].points.map(p => p.status), ["verified", "failed", "failed", "failed"]);
+  assert.match(v.differentials[0].points[1].citations[0].reason, /not on that page/);
+  assert.match(v.differentials[0].points[2].citations[0].reason, /never retrieved/);
+  assert.match(v.differentials[0].points[3].citations[0].reason, /does not exist/);
+  assert.equal(v.askNext[0].status, "uncited");
+  assert.ok(v.pages["bk1:12"].text.includes("bronchiolitis"));
+  assert.deepEqual(v.stats, { verified: 2, failed: 3, uncited: 1 });
+});

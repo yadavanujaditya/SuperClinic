@@ -15,6 +15,7 @@ only, the same as before.
 | Uploaded PDFs, tags, patient sessions | none | No (not stored anywhere yet) |
 | My Agent: past summaries (de-identified) | `users/{uid}/summaries/{id}` | Yes (written by the server only) |
 | My Agent: memory notes | `users/{uid}/memories/{id}` | Yes |
+| Notebook: your books (page text) | `users/{uid}/books/{id}` + `/shards` | Yes (private to you) |
 | My Agent: learning/drafting runs, daily usage | `users/{uid}/agentRuns`, `users/{uid}/usage` | Yes (server only) |
 
 - Data saved **before** signing in is uploaded the first time you sign in, so nothing is lost.
@@ -100,6 +101,33 @@ With the fake server, the emulators and `npm run dev` all running:
 ```bash
 node e2e/agent.e2e.cjs
 ```
+
+## ClinicFlow Notebook (ask your own books)
+
+ClinicFlow → **📓 Notebook**, or **📓 Ask my books** during a consultation.
+
+1. **Upload your PDFs.** Text is extracted page by page in the browser and saved privately
+   to your account, keeping each page number. Scanned, image-only books have no text and
+   aren't supported yet.
+2. **Type the complaints**, e.g. "cough for 5 days, fever for 10 days", with age and sex, or
+   ask any question. Follow-up questions keep the context.
+3. **The agent searches and answers** (`functions/src/notebook.js` on the same harness). It
+   searches your books several times. Search understands everyday words: "loose motions"
+   also finds diarrhoea/gastroenteritis, "fits" finds seizures, "cold" finds coryza. It reads
+   the relevant pages and answers with a summary, differentials, what to ask or examine next,
+   red flags, and what your books don't cover.
+4. **Every point carries citations**: book, page and a verbatim quote. The server checks each
+   quote against that page's actual text before you see it:
+   - ✓ **green chip**: verified. Tap it to open the page with the sentence highlighted.
+   - ⚠ **red chip**: rejected. The quote isn't on that page, or the passage was never
+     retrieved, or it doesn't exist. Tap it to see why.
+   - **grey "general knowledge"**: a point not from your books, clearly labelled.
+
+Limits: 150 notebook questions per doctor per day. Copyright: books stay private to the
+account that uploaded them and are never shared.
+
+Test: `node e2e/notebook.e2e.cjs`, using the same setup as the agent test. It uploads
+`e2e/fixtures/test-paediatrics-handbook.pdf`, a short original test text.
 
 ## Step 1: Test locally (no Firebase account needed)
 

@@ -5,6 +5,7 @@
 //                              chains follow-up runs until every summary is learned
 //   draftSummary   (callable)  draft a new summary from inputs + memory, verified line by line
 //   nightlyLearning(schedule)  02:00 IST: queue learning for doctors with new summaries
+//   askNotebook    (callable)  ClinicFlow Notebook: cited answers from the doctor's own books
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -16,6 +17,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { deidentify } from "./deidentify.js";
 import { runLearning, runDrafting, LEARN_BATCH, slugCategory } from "./agents.js";
 import { AgentError } from "./harness.js";
+import { loadBookIndex } from "./books.js";
+import { runNotebook } from "./notebook.js";
 
 initializeApp();
 const db = getFirestore();
@@ -28,6 +31,7 @@ export const LIMITS = {
   summaryChars: [80, 60_000],
   inputChars: 80_000,
   draftsPerDay: 60,
+  notebookPerDay: 150,
   learnRunsPerDay: 40,
   maxLogEntries: 150,
 };
@@ -232,4 +236,36 @@ export const nightlyLearning = onSchedule({ schedule: "0 2 * * *", timeZone: "As
     } catch (e) { logger.warn("Skip nightly learning", { uid: u.id, reason: e.message }); }
   }
   logger.info("Nightly learning queued", { queued });
+});
+
+// ── askNotebook: ClinicFlow Notebook ─────────────────────────────────────────
+export const askNotebook = onCall({ secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 300, memory: "2GiB" }, async (req) => {
+  const uid = requireUser(req);
+  const { patient = {}, complaints = "", question = "", history = [] } = req.data || {};
+  if (typeof complaints !== "string" || typeof question !== "string") throw new HttpsError("invalid-argument", "complaints and question must be text");
+  if ((complaints + question).trim().length < 3) throw new HttpsError("invalid-argument", "Type the complaints or a question first.");
+  if (complaints.length + question.length > 4000) throw new HttpsError("invalid-argument", "Please keep it under 4000 characters.");
+  const hist = Array.isArray(history) ? history.slice(-3).map(h => ({ q: deidentify(String(h?.q || "").slice(0, 500)).text, a: deidentify(String(h?.a || "").slice(0, 1500)).text })) : [];
+
+  const index = await loadBookIndex(db, uid);
+  if (!index.size) throw new HttpsError("failed-precondition", "Upload at least one book (PDF with text) to your notebook first.");
+  await consumeQuota(uid, "notebook", LIMITS.notebookPerDay);
+
+  const runRef = db.collection(`users/${uid}/agentRuns`).doc();
+  await runRef.set({ kind: "notebook", status: "running", createdAt: FieldValue.serverTimestamp() });
+  try {
+    const res = await runNotebook({
+      client: client(), index,
+      patient: { age: String(patient.age || "").slice(0, 30), sex: String(patient.sex || "").slice(0, 20) },
+      complaints: deidentify(complaints).text, question: deidentify(question).text, history: hist,
+    });
+    await recordTokens(uid, res.usage);
+    await runRef.update({ status: "done", stats: res.answer.stats, usage: res.usage, turns: res.turns, finishedAt: FieldValue.serverTimestamp() });
+    return res.answer;
+  } catch (err) {
+    logger.error("Notebook failed", { uid, err: err?.message, code: err?.code });
+    await runRef.update({ status: "failed", error: err?.message || "failed", finishedAt: FieldValue.serverTimestamp() });
+    if (err instanceof AgentError) throw new HttpsError(err.code === "rate_limited" ? "resource-exhausted" : "internal", err.message);
+    throw new HttpsError("internal", err?.message || "The notebook could not answer. Please try again.");
+  }
 });
