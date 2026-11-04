@@ -57,7 +57,12 @@ const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-typ
   ok(badCites === 1, 'the made-up quote ("antibiotics are always required") is caught');
   ok((await page.locator('[data-testid=nb-point-uncited]').count()) === 1, 'uncited point labelled as general knowledge');
   ok(/Local antibiotic resistance/.test(await page.textContent('[data-testid=nb-answer]')), '"not covered by your books" listed');
-  await page.screenshot({ path: path.join(SHOTS, 'notebook-1-answer.png'), fullPage: true });
+  await page.evaluate(() => document.querySelector('[data-testid=notebook]').scrollTo(0, 0));
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: path.join(SHOTS, 'notebook-1-answer.png') });
+  await page.locator('[data-testid=nb-diff]').first().evaluate(el => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => document.querySelector('[data-testid=notebook]').scrollBy(0, -90));
+  await page.screenshot({ path: path.join(SHOTS, 'notebook-1b-differentials.png') });
 
   // Open a verified citation → page with the quote highlighted
   await page.locator('[data-testid=nb-diff]', { hasText: 'Pneumonia' }).locator('[data-testid=nb-cite-ok]').first().click();
